@@ -9,6 +9,10 @@ export default function ProfileLayout() {
         headerTintColor: COLORS.text,
         headerTitleStyle: { fontWeight: '700' },
       }}
-    />
+    >
+      <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="subscription" options={{ title: '' }} />
+      <Stack.Screen name="settings" options={{ title: '' }} />
+    </Stack>
   );
 }

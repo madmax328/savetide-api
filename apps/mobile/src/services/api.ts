@@ -3,7 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
 
 function getApiUrl(): string {
-  if (!__DEV__) return 'https://api.savetide.com/api';
+  if (!__DEV__) return 'https://savetide-api-production.up.railway.app/api';
 
   // In Expo Go, hostUri is "192.168.x.x:8081" — extract the IP
   const hostUri = Constants.expoConfig?.hostUri;

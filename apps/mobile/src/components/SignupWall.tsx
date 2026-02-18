@@ -9,13 +9,15 @@ import {
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
-import { COLORS, SPACING, BORDER_RADIUS } from '../utils/constants';
+import { COLORS, SPACING, BORDER_RADIUS, SUBSCRIPTION_PRICE } from '../utils/constants';
 import { useFreeUsageStore } from '../store/freeUsageStore';
+import { useAuthStore } from '../store/authStore';
 
 export default function SignupWall() {
   const { t } = useTranslation();
   const router = useRouter();
   const { showSignupWall, dismissWall } = useFreeUsageStore();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
   if (!showSignupWall) return null;
 
@@ -30,7 +32,7 @@ export default function SignupWall() {
         <View style={styles.card}>
           {/* Icon */}
           <View style={styles.iconCircle}>
-            <FontAwesome name="lock" size={32} color={COLORS.primary} />
+            <FontAwesome name="star" size={32} color={COLORS.accent} />
           </View>
 
           {/* Title */}
@@ -38,6 +40,9 @@ export default function SignupWall() {
 
           {/* Description */}
           <Text style={styles.description}>{t('freeLimit.description')}</Text>
+
+          {/* Price */}
+          <Text style={styles.price}>{SUBSCRIPTION_PRICE.EUR}€{t('profile.perMonth')}</Text>
 
           {/* Features */}
           <View style={styles.features}>
@@ -55,26 +60,42 @@ export default function SignupWall() {
             </View>
           </View>
 
-          {/* Sign up button */}
+          {/* Subscribe button */}
           <TouchableOpacity
-            style={styles.signupButton}
+            style={styles.subscribeButton}
             onPress={() => {
               dismissWall();
-              router.push('/(auth)/register');
+              if (!isAuthenticated) {
+                // Must login first to subscribe
+                router.push('/(auth)/register');
+              } else {
+                router.push('/(tabs)/profile/subscription' as any);
+              }
             }}
           >
-            <Text style={styles.signupButtonText}>{t('freeLimit.signup')}</Text>
+            <FontAwesome name="star" size={16} color={COLORS.white} />
+            <Text style={styles.subscribeButtonText}>{t('freeLimit.subscribe')}</Text>
           </TouchableOpacity>
 
-          {/* Login link */}
+          {/* Login link (if not logged in) */}
+          {!isAuthenticated && (
+            <TouchableOpacity
+              style={styles.loginLink}
+              onPress={() => {
+                dismissWall();
+                router.push('/(auth)/login');
+              }}
+            >
+              <Text style={styles.loginLinkText}>{t('freeLimit.hasAccount')}</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Close */}
           <TouchableOpacity
-            style={styles.loginLink}
-            onPress={() => {
-              dismissWall();
-              router.push('/(auth)/login');
-            }}
+            style={styles.closeButton}
+            onPress={dismissWall}
           >
-            <Text style={styles.loginLinkText}>{t('freeLimit.hasAccount')}</Text>
+            <Text style={styles.closeButtonText}>{t('common.cancel')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -137,15 +158,24 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontWeight: '500',
   },
-  signupButton: {
-    backgroundColor: COLORS.primary,
+  price: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: COLORS.primary,
+    marginBottom: SPACING.lg,
+  },
+  subscribeButton: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.accent,
     borderRadius: BORDER_RADIUS.md,
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.xl,
     width: '100%',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
   },
-  signupButtonText: {
+  subscribeButtonText: {
     color: COLORS.white,
     fontSize: 16,
     fontWeight: '700',
@@ -157,5 +187,12 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontSize: 14,
     fontWeight: '600',
+  },
+  closeButton: {
+    marginTop: SPACING.sm,
+  },
+  closeButtonText: {
+    color: COLORS.textMuted,
+    fontSize: 14,
   },
 });

@@ -9,6 +9,9 @@ export default function ScanLayout() {
         headerTintColor: COLORS.text,
         headerTitleStyle: { fontWeight: '700' },
       }}
-    />
+    >
+      <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="results" options={{ headerShown: true, title: '' }} />
+    </Stack>
   );
 }

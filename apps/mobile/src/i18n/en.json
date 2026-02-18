@@ -130,13 +130,13 @@
     "version": "Version"
   },
   "freeLimit": {
-    "title": "Create your free account",
-    "description": "You've used your 3 free searches. Sign up to keep comparing prices!",
+    "title": "Go Premium",
+    "description": "You've used your 3 free searches. Subscribe for unlimited price comparisons!",
     "feature1": "Unlimited price searches",
-    "feature2": "Access to all marketplaces",
-    "feature3": "Save your favorite products",
-    "signup": "Sign up for free",
+    "feature2": "Price drop alerts",
+    "feature3": "Price tracking + history",
+    "subscribe": "Subscribe now",
     "hasAccount": "Already have an account? Sign in",
-    "banner": "Sign up for unlimited searches"
+    "banner": "Go Premium for unlimited searches"
   }
 }

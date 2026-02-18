@@ -88,7 +88,7 @@ export default function SplashAnimation({ onAnimationComplete }: SplashAnimation
   return (
     <Animated.View style={[styles.container, containerAnimatedStyle]}>
       <LinearGradient
-        colors={['#0F172A', '#0c2d5e', '#0F172A']}
+        colors={['#FFFFFF', '#E0F2FE', '#FFFFFF']}
         style={styles.gradient}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
   logo: {
     fontSize: 52,
     fontWeight: '800',
-    color: COLORS.text,
+    color: '#0F172A',
     letterSpacing: -2,
   },
   logoAccent: {
@@ -146,7 +146,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
-    color: COLORS.textSecondary,
+    color: '#64748B',
     marginTop: 8,
     fontWeight: '500',
     letterSpacing: 0.5,

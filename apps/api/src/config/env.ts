@@ -12,7 +12,7 @@ const envSchema = z.object({
   STRIPE_WEBHOOK_SECRET: z.string().default(''),
   STRIPE_PRICE_ID_EUR: z.string().default(''),
   STRIPE_PRICE_ID_USD: z.string().default(''),
-  SERPAPI_KEY: z.string().min(1, 'SERPAPI_KEY is required'),
+  SERPAPI_KEY: z.string().default(''),
   EXPO_ACCESS_TOKEN: z.string().default(''),
 });
 

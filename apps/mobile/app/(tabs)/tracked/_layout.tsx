@@ -9,6 +9,9 @@ export default function TrackedLayout() {
         headerTintColor: COLORS.text,
         headerTitleStyle: { fontWeight: '700' },
       }}
-    />
+    >
+      <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="[productId]" options={{ title: '' }} />
+    </Stack>
   );
 }

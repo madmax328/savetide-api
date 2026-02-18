@@ -158,8 +158,32 @@ export default function ScanScreen() {
     );
   }
 
+  const isPremium = useAuthStore((state) => state.isPremium());
+
   return (
     <SafeAreaView style={styles.container}>
+      {/* Top bar with action buttons */}
+      <View style={styles.topBar}>
+        <View style={{ flex: 1 }} />
+        {!isAuthenticated ? (
+          <TouchableOpacity
+            style={styles.topButton}
+            onPress={() => router.push('/(auth)/login')}
+          >
+            <FontAwesome name="sign-in" size={14} color={COLORS.white} />
+            <Text style={styles.topButtonText}>{t('auth.signIn')}</Text>
+          </TouchableOpacity>
+        ) : !isPremium ? (
+          <TouchableOpacity
+            style={[styles.topButton, styles.premiumButton]}
+            onPress={() => router.push('/(tabs)/profile/subscription' as any)}
+          >
+            <FontAwesome name="star" size={14} color={COLORS.white} />
+            <Text style={styles.topButtonText}>Premium</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+
       <View style={styles.content}>
         <Text style={styles.logo}>SaveTide</Text>
         <Text style={styles.subtitle}>{t('app.tagline')}</Text>
@@ -200,13 +224,19 @@ export default function ScanScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Guest mode: show remaining searches */}
-        {!isAuthenticated && (
+        {/* Guest/Free user: show premium banner */}
+        {(!isAuthenticated || !isPremium) && (
           <TouchableOpacity
             style={styles.guestBanner}
-            onPress={() => router.push('/(auth)/register')}
+            onPress={() => {
+              if (!isAuthenticated) {
+                router.push('/(auth)/register');
+              } else {
+                router.push('/(tabs)/profile/subscription' as any);
+              }
+            }}
           >
-            <FontAwesome name="user-plus" size={14} color={COLORS.primary} />
+            <FontAwesome name="star" size={14} color={COLORS.accent} />
             <Text style={styles.guestBannerText}>{t('freeLimit.banner')}</Text>
           </TouchableOpacity>
         )}
@@ -223,10 +253,35 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.sm,
+    paddingBottom: SPACING.xs,
+  },
+  topButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.full,
+  },
+  premiumButton: {
+    backgroundColor: COLORS.accent,
+  },
+  topButtonText: {
+    color: COLORS.white,
+    fontSize: 13,
+    fontWeight: '700',
+  },
   content: {
     flex: 1,
     paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.xxl,
+    paddingTop: SPACING.lg,
     alignItems: 'center',
   },
   logo: {

@@ -130,13 +130,13 @@
     "version": "Version"
   },
   "freeLimit": {
-    "title": "Créez votre compte gratuit",
-    "description": "Vous avez utilisé vos 3 recherches gratuites. Inscrivez-vous pour continuer à comparer les prix !",
+    "title": "Passez à Premium",
+    "description": "Vous avez utilisé vos 3 recherches gratuites. Abonnez-vous pour des recherches illimitées !",
     "feature1": "Recherches de prix illimitées",
-    "feature2": "Accès à toutes les marketplaces",
-    "feature3": "Sauvegardez vos produits favoris",
-    "signup": "S'inscrire gratuitement",
+    "feature2": "Alertes de baisse de prix",
+    "feature3": "Suivi de prix + historique",
+    "subscribe": "S'abonner maintenant",
     "hasAccount": "Déjà un compte ? Se connecter",
-    "banner": "Inscrivez-vous pour des recherches illimitées"
+    "banner": "Passez à Premium pour des recherches illimitées"
   }
 }

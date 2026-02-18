@@ -4,13 +4,13 @@ export const COLORS = {
   secondary: '#10B981',     // Emerald green (for best price)
   accent: '#F59E0B',        // Amber (for deals/discount)
   danger: '#EF4444',        // Red
-  background: '#0F172A',    // Dark navy
-  surface: '#1E293B',       // Slightly lighter navy
-  surfaceLight: '#334155',  // Card backgrounds
-  text: '#F8FAFC',          // Almost white
-  textSecondary: '#94A3B8', // Muted text
-  textMuted: '#64748B',     // Very muted
-  border: '#334155',
+  background: '#F1F5F9',    // Light gray
+  surface: '#FFFFFF',       // White cards
+  surfaceLight: '#F8FAFC',  // Slightly off-white
+  text: '#0F172A',          // Dark navy text
+  textSecondary: '#64748B', // Muted text
+  textMuted: '#94A3B8',     // Very muted
+  border: '#E2E8F0',        // Light gray border
   success: '#10B981',
   warning: '#F59E0B',
   white: '#FFFFFF',

@@ -58,7 +58,7 @@ export default function TabLayout() {
         options={{
           title: t('tabs.tracked'),
           headerShown: false,
-          tabBarIcon: ({ color }) => <TabBarIcon name="heart" color={color} />,
+          tabBarIcon: ({ color }) => <TabBarIcon name="line-chart" color={color} />,
         }}
       />
       <Tabs.Screen
