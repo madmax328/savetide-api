@@ -29,7 +29,8 @@
       "edgeToEdgeEnabled": true,
       "package": "com.savetide.app",
       "permissions": [
-        "CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -59,8 +60,10 @@
     },
     "extra": {
       "eas": {
-        "projectId": ""
-      }
-    }
+        "projectId": "434de9aa-d7f2-487e-820e-a2168522d1f8"
+      },
+      "router": {}
+    },
+    "owner": "madmax328"
   }
 }
