@@ -18,7 +18,8 @@
       "bundleIdentifier": "com.savetide.app",
       "infoPlist": {
         "NSCameraUsageDescription": "SaveTide needs camera access to scan product barcodes.",
-        "NSPhotoLibraryUsageDescription": "SaveTide needs photo library access to search products by image."
+        "NSPhotoLibraryUsageDescription": "SaveTide needs photo library access to search products by image.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
