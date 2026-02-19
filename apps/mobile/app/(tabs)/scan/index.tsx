@@ -26,6 +26,7 @@ export default function ScanScreen() {
   const { user, isAuthenticated } = useAuthStore();
   const { searchByText, searchByBarcode, searchByImage, isSearching, error: scanError } = useScanStore();
   const { isLimitReached, incrementSearch, loadCount } = useFreeUsageStore();
+  const isPremium = useAuthStore((state) => state.isPremium());
   const [searchQuery, setSearchQuery] = useState('');
   const [showScanner, setShowScanner] = useState(false);
 
@@ -165,8 +166,6 @@ export default function ScanScreen() {
       </SafeAreaView>
     );
   }
-
-  const isPremium = useAuthStore((state) => state.isPremium());
 
   return (
     <SafeAreaView style={styles.container}>

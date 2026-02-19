@@ -188,6 +188,16 @@ export async function searchProducts(
   // 5. Return with affiliate URLs
   const result = product.toObject() as IProduct;
   result.prices = applyAffiliateUrls(result.prices);
+
+  // Debug: log first price to verify productUrl is present
+  if (result.prices.length > 0) {
+    logger.info({
+      firstPriceUrl: result.prices[0].productUrl,
+      firstPriceStore: result.prices[0].storeName,
+      totalPrices: result.prices.length,
+    }, 'Product search — returning prices');
+  }
+
   return result;
 }
 

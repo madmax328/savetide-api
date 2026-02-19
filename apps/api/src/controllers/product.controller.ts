@@ -57,6 +57,17 @@ export async function search(req: Request, res: Response): Promise<void> {
 
     const product = await productService.searchProducts(q, country);
 
+    // Debug: log the first price to verify productUrl is in the JSON
+    if (product.prices && product.prices.length > 0) {
+      const p0 = product.prices[0];
+      logger.info({
+        productUrl: p0.productUrl,
+        marketplace: p0.marketplace,
+        hasUrl: Boolean(p0.productUrl),
+        priceKeys: Object.keys(p0),
+      }, 'Controller search — first price debug');
+    }
+
     res.json({ product });
   } catch (error) {
     if (error instanceof z.ZodError) {
