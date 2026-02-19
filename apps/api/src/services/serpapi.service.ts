@@ -10,6 +10,7 @@ import { IStorePrice } from '../models/Product';
 interface SerpApiShoppingResult {
   title: string;
   link: string;
+  product_link?: string;
   source: string;
   price?: string;
   extracted_price?: number;
@@ -26,7 +27,7 @@ interface SerpApiShoppingResponse {
   error?: string;
 }
 
-interface SerpApiLensResult {
+interface SerpApiLensVisualMatch {
   title?: string;
   link?: string;
   source?: string;
@@ -34,8 +35,8 @@ interface SerpApiLensResult {
 }
 
 interface SerpApiLensResponse {
-  visual_matches?: SerpApiLensResult[];
-  knowledge_graph?: Array<{ title?: string }>;
+  visual_matches?: SerpApiLensVisualMatch[];
+  knowledge_graph?: Array<{ title?: string; subtitle?: string }>;
   search_metadata?: { status: string; id: string };
   error?: string;
 }
@@ -62,7 +63,6 @@ const EXCLUDED_MARKETPLACES = [
 // ---------------------------------------------------------------------------
 
 const FR_MARKETPLACE_MAP: Record<string, string> = {
-  // Major FR retailers
   'amazon.fr': 'amazon_fr',
   'cdiscount.com': 'cdiscount',
   'fnac.com': 'fnac',
@@ -73,17 +73,14 @@ const FR_MARKETPLACE_MAP: Record<string, string> = {
   'leclerc.com': 'leclerc',
   'e.leclerc': 'leclerc',
   'carrefour.fr': 'carrefour',
-  // Electronics & Tech
   'ldlc.com': 'ldlc',
   'materiel.net': 'materiel_net',
   'grosbill.com': 'grosbill',
   'cybertek.fr': 'cybertek',
   'topachat.com': 'topachat',
   'inmac-wstore.com': 'inmac',
-  // Refurbished
   'backmarket.fr': 'backmarket',
   'backmarket.com': 'backmarket',
-  // General
   'ebay.fr': 'ebay',
   'rueducommerce.fr': 'rueducommerce',
   'conforama.fr': 'conforama',
@@ -95,55 +92,43 @@ const FR_MARKETPLACE_MAP: Record<string, string> = {
   'cultura.com': 'cultura',
   'micromania.fr': 'micromania',
   'electrodepot.fr': 'electrodepot',
-  // Beauty & Health
   'sephora.fr': 'sephora',
   'nocibe.fr': 'nocibe',
   'marionnaud.fr': 'marionnaud',
-  // Fashion
   'zalando.fr': 'zalando',
   'asos.com': 'asos',
 };
 
 const US_MARKETPLACE_MAP: Record<string, string> = {
-  // Major US retailers
   'amazon.com': 'amazon_com',
   'ebay.com': 'ebay',
   'walmart.com': 'walmart',
   'target.com': 'target',
   'bestbuy.com': 'bestbuy',
   'homedepot.com': 'homedepot',
-  // Electronics & Tech
   'newegg.com': 'newegg',
   'bhphotovideo.com': 'bhphoto',
   'adorama.com': 'adorama',
   'microcenter.com': 'microcenter',
-  // Wholesale / Membership
   'costco.com': 'costco',
   'samsclub.com': 'samsclub',
-  // Refurbished
   'backmarket.com': 'backmarket',
-  // General / Department
   'kohls.com': 'kohls',
   'macys.com': 'macys',
   'nordstrom.com': 'nordstrom',
   'jcpenney.com': 'jcpenney',
-  // Home
   'lowes.com': 'lowes',
   'wayfair.com': 'wayfair',
   'overstock.com': 'overstock',
-  // Sports & Outdoor
   'dickssportinggoods.com': 'dickssporting',
   'rei.com': 'rei',
-  // Beauty
   'sephora.com': 'sephora',
   'ulta.com': 'ulta',
-  // Office
   'staples.com': 'staples',
   'officedepot.com': 'officedepot',
 };
 
 const SOURCE_NAME_MAP: Record<string, string> = {
-  // --- France ---
   'Amazon.fr': 'amazon_fr',
   'Cdiscount': 'cdiscount',
   'Fnac': 'fnac',
@@ -174,7 +159,6 @@ const SOURCE_NAME_MAP: Record<string, string> = {
   'Grosbill': 'grosbill',
   'Cybertek': 'cybertek',
   'TopAchat': 'topachat',
-  // --- United States ---
   'Amazon.com': 'amazon_com',
   'Amazon': 'amazon_com',
   'eBay': 'ebay',
@@ -207,16 +191,10 @@ const SOURCE_NAME_MAP: Record<string, string> = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Detect our internal marketplace key from the SerpApi result source name
- * and product link URL.
- */
 export function detectMarketplace(source: string, link: string): string {
-  // 1. Try exact source-name match first
   const fromSource = SOURCE_NAME_MAP[source];
   if (fromSource) return fromSource;
 
-  // 2. Try partial match on source name (case-insensitive)
   const sourceLower = source.toLowerCase();
   for (const [name, key] of Object.entries(SOURCE_NAME_MAP)) {
     if (sourceLower.includes(name.toLowerCase())) {
@@ -224,7 +202,6 @@ export function detectMarketplace(source: string, link: string): string {
     }
   }
 
-  // 3. Try domain extraction from URL
   try {
     const hostname = new URL(link).hostname.replace(/^www\./, '');
 
@@ -234,51 +211,57 @@ export function detectMarketplace(source: string, link: string): string {
     const usMatch = US_MARKETPLACE_MAP[hostname];
     if (usMatch) return usMatch;
 
-    // Partial domain match for subdomains
     for (const [domain, key] of Object.entries({ ...FR_MARKETPLACE_MAP, ...US_MARKETPLACE_MAP })) {
       if (hostname.endsWith(domain)) {
         return key;
       }
     }
   } catch {
-    // URL parsing failed — fall through
+    // URL parsing failed
   }
 
-  // 4. Fallback: sanitise source name into a key
   return source
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '_')
     .replace(/^_|_$/g, '');
 }
 
-/**
- * Returns true if a result should be filtered out based on the excluded
- * marketplace list.
- */
 function isExcludedMarketplace(source: string, link: string): boolean {
   const combined = `${source} ${link}`.toLowerCase();
   return EXCLUDED_MARKETPLACES.some((name) => combined.includes(name));
 }
 
-/**
- * Parse a currency symbol / code into our currency enum.
- */
 function parseCurrency(priceString: string | undefined, country: string): 'EUR' | 'USD' {
   if (priceString && priceString.includes('$')) return 'USD';
-  if (priceString && priceString.includes('\u20AC')) return 'EUR'; // euro sign
+  if (priceString && priceString.includes('\u20AC')) return 'EUR';
   return country === 'FR' ? 'EUR' : 'USD';
 }
 
 /**
- * Map a single SerpApi shopping result to our IStorePrice shape.
- * Note: productUrl is the raw URL here; affiliate wrapping happens at the
- * product-service layer.
+ * Get the best available URL from a SerpApi shopping result.
+ * Prefers direct retailer link, falls back to product_link (Google comparison).
  */
+function getBestUrl(result: SerpApiShoppingResult): string {
+  if (result.link && result.link.startsWith('http')) {
+    return result.link;
+  }
+  if (result.product_link && result.product_link.startsWith('http')) {
+    return result.product_link;
+  }
+  return '';
+}
+
 function mapToStorePrice(result: SerpApiShoppingResult, country: string): IStorePrice | null {
   const price = result.extracted_price;
   if (price == null || price <= 0) return null;
 
-  const marketplace = detectMarketplace(result.source, result.link);
+  const url = getBestUrl(result);
+  if (!url) {
+    logger.warn({ source: result.source, title: result.title }, 'Skipping result — no URL');
+    return null;
+  }
+
+  const marketplace = detectMarketplace(result.source, url);
 
   return {
     marketplace,
@@ -286,7 +269,7 @@ function mapToStorePrice(result: SerpApiShoppingResult, country: string): IStore
     storeLogo: '',
     price,
     currency: parseCurrency(result.price, country),
-    productUrl: result.link,
+    productUrl: url,
     inStock: true,
     lastChecked: new Date(),
     externalId: result.product_id,
@@ -335,13 +318,22 @@ export async function searchGoogleShopping(
       return { prices: [], rawTitle: '', rawThumbnail: '' };
     }
 
-    // Filter excluded marketplaces, map, deduplicate, sort by price ascending
+    // Debug: log raw first result structure
+    const r0 = rawResults[0];
+    logger.info({
+      firstLink: r0?.link?.substring(0, 100),
+      firstProductLink: (r0 as any)?.product_link?.substring(0, 100),
+      firstSource: r0?.source,
+      rawKeys: Object.keys(r0),
+      totalRaw: rawResults.length,
+    }, 'SerpApi raw first result');
+
     const allPrices = rawResults
-      .filter((r) => !isExcludedMarketplace(r.source, r.link))
+      .filter((r) => !isExcludedMarketplace(r.source, r.link || ''))
       .map((r) => mapToStorePrice(r, country))
       .filter((p): p is IStorePrice => p !== null);
 
-    // Deduplicate: keep only the cheapest price per marketplace
+    // Deduplicate: cheapest per marketplace
     const pricesByStore = new Map<string, IStorePrice>();
     for (const p of allPrices) {
       const existing = pricesByStore.get(p.marketplace);
@@ -354,14 +346,17 @@ export async function searchGoogleShopping(
       .sort((a, b) => a.price - b.price)
       .slice(0, 10);
 
-    // Use the first result for product metadata fallback
     const rawTitle = rawResults[0]?.title ?? '';
     const rawThumbnail = rawResults[0]?.thumbnail ?? '';
 
-    logger.info(
-      { query, totalRaw: rawResults.length, afterDedup: prices.length },
-      'SerpApi shopping results processed',
-    );
+    // Debug: log first processed price
+    if (prices.length > 0) {
+      logger.info({
+        firstPriceUrl: prices[0].productUrl?.substring(0, 100),
+        firstPriceStore: prices[0].storeName,
+        count: prices.length,
+      }, 'SerpApi processed prices');
+    }
 
     return { prices, rawTitle, rawThumbnail };
   } catch (error) {
@@ -371,8 +366,11 @@ export async function searchGoogleShopping(
 }
 
 /**
- * Search by barcode / EAN / UPC — simply forwards the barcode string as the
- * search query which works well on Google Shopping.
+ * Search by barcode / EAN / UPC.
+ *
+ * Strategy: first look up the barcode on regular Google Search to find the
+ * actual product name, then search Google Shopping with that name.
+ * This gives much better results than searching Shopping with a raw number.
  */
 export async function searchByBarcode(
   barcode: string,
@@ -383,12 +381,58 @@ export async function searchByBarcode(
   rawThumbnail: string;
 }> {
   logger.info({ barcode, country }, 'SerpApi barcode search');
-  return searchGoogleShopping(barcode, country);
+
+  const gl = country === 'FR' ? 'fr' : 'us';
+  const hl = country === 'FR' ? 'fr' : 'en';
+
+  try {
+    // Step 1: Google search to resolve barcode → product name
+    const googleResponse = await getJson({
+      engine: 'google',
+      q: barcode,
+      gl,
+      hl,
+      api_key: env.SERPAPI_KEY,
+      num: 5,
+    }) as any;
+
+    let productName = '';
+
+    // Try knowledge graph first (most reliable)
+    if (googleResponse.knowledge_graph?.title) {
+      productName = googleResponse.knowledge_graph.title;
+      logger.info({ barcode, productName, source: 'knowledge_graph' }, 'Barcode resolved');
+    }
+    // Try organic results
+    else if (googleResponse.organic_results?.[0]?.title) {
+      productName = googleResponse.organic_results[0].title
+        .replace(/\s*[-|:]?\s*(Amazon|Fnac|Cdiscount|eBay|Darty|Boulanger|Walmart|Target|Best Buy|Rakuten|Leclerc|Carrefour).*$/i, '')
+        .replace(/\s*[-|:]\s*Achat\s*.*/i, '')
+        .replace(/\s*[-|:]\s*Prix\s*.*/i, '')
+        .trim();
+      logger.info({ barcode, productName, source: 'organic_results' }, 'Barcode resolved');
+    }
+
+    if (productName && productName.length > 3) {
+      return searchGoogleShopping(productName, country);
+    }
+
+    // Fallback: direct barcode number search on Shopping
+    logger.info({ barcode }, 'Could not resolve barcode to name, searching directly');
+    return searchGoogleShopping(barcode, country);
+  } catch (error) {
+    logger.error({ error, barcode }, 'Barcode lookup failed, falling back to direct search');
+    return searchGoogleShopping(barcode, country);
+  }
 }
 
 /**
- * Search by image URL using Google Lens, then run a shopping search with the
- * identified product name.
+ * Search by image.
+ *
+ * SerpApi Google Lens requires a PUBLICLY ACCESSIBLE URL (not base64).
+ * Since we receive base64 from the mobile app, we need to upload it first.
+ * For now we upload to imgbb (free, no auth needed for small images).
+ * If that fails, we return empty results.
  */
 export async function searchByImage(
   imageUrl: string,
@@ -399,13 +443,25 @@ export async function searchByImage(
   rawThumbnail: string;
   identifiedName: string;
 }> {
-  logger.info({ imageUrl, country }, 'SerpApi Google Lens image search');
+  logger.info({ country, isBase64: imageUrl.startsWith('data:') }, 'Image search requested');
+
+  let publicUrl = imageUrl;
+
+  // If base64, upload to get a public URL
+  if (imageUrl.startsWith('data:')) {
+    try {
+      publicUrl = await uploadBase64ToPublicUrl(imageUrl);
+      logger.info({ publicUrl: publicUrl.substring(0, 80) }, 'Image uploaded for Lens');
+    } catch (uploadError) {
+      logger.error({ error: uploadError }, 'Failed to upload image for Google Lens');
+      return { prices: [], rawTitle: '', rawThumbnail: '', identifiedName: '' };
+    }
+  }
 
   try {
-    // Step 1: Identify product via Google Lens
     const lensResponse = (await getJson({
       engine: 'google_lens',
-      url: imageUrl,
+      url: publicUrl,
       api_key: env.SERPAPI_KEY,
     })) as SerpApiLensResponse;
 
@@ -414,7 +470,6 @@ export async function searchByImage(
       throw new Error(`SerpApi Lens error: ${lensResponse.error}`);
     }
 
-    // Try to extract a product name from knowledge graph first, then visual matches
     let identifiedName = '';
 
     if (lensResponse.knowledge_graph && lensResponse.knowledge_graph.length > 0) {
@@ -426,18 +481,69 @@ export async function searchByImage(
     }
 
     if (!identifiedName) {
-      logger.warn({ imageUrl }, 'Google Lens could not identify product from image');
+      logger.warn('Google Lens could not identify product from image');
       return { prices: [], rawTitle: '', rawThumbnail: '', identifiedName: '' };
     }
 
     logger.info({ identifiedName }, 'Google Lens identified product');
 
-    // Step 2: Search shopping with identified name
     const shoppingResult = await searchGoogleShopping(identifiedName, country);
-
     return { ...shoppingResult, identifiedName };
   } catch (error) {
-    logger.error({ error, imageUrl }, 'SerpApi Google Lens request failed');
+    logger.error({ error }, 'SerpApi Google Lens request failed');
     throw error;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Image upload helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Upload a base64 image to imgbb (free image hosting) to get a public URL.
+ * This is needed because SerpApi Google Lens requires a public URL.
+ */
+async function uploadBase64ToPublicUrl(dataUri: string): Promise<string> {
+  // Extract raw base64 (remove data:image/...;base64, prefix)
+  const base64Data = dataUri.replace(/^data:image\/[a-z]+;base64,/, '');
+
+  // Use imgbb free API (no key needed for anonymous uploads)
+  // Alternative: we can use a simple POST to a free service
+  const formData = new URLSearchParams();
+  formData.append('image', base64Data);
+
+  const response = await fetch('https://api.imgbb.com/1/upload?key=00000000000000000000000000000000', {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    // Fallback: try freeimage.host
+    const fallbackForm = new URLSearchParams();
+    fallbackForm.append('source', base64Data);
+    fallbackForm.append('type', 'base64');
+    fallbackForm.append('action', 'upload');
+
+    const fallbackResponse = await fetch('https://freeimage.host/api/1/upload?key=6d207e02198a847aa98d0a2a901485a5', {
+      method: 'POST',
+      body: fallbackForm,
+    });
+
+    if (!fallbackResponse.ok) {
+      throw new Error('Failed to upload image to any hosting service');
+    }
+
+    const fallbackData = await fallbackResponse.json() as any;
+    if (fallbackData?.image?.url) {
+      return fallbackData.image.url as string;
+    }
+    throw new Error('No URL in freeimage response');
+  }
+
+  const data = await response.json() as any;
+  if (data?.data?.url) {
+    return data.data.url as string;
+  }
+
+  throw new Error('No URL in imgbb response');
 }

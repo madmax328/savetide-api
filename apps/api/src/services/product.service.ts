@@ -160,10 +160,15 @@ export async function searchProducts(
   });
 
   if (existing && isCacheFresh(existing)) {
-    logger.info({ productId: existing._id }, 'Serving product from cache');
-    const doc = existing.toObject() as IProduct;
-    doc.prices = applyAffiliateUrls(doc.prices);
-    return doc;
+    // Verify cached data has valid URLs before serving
+    const hasValidUrls = existing.prices.some((p) => p.productUrl && p.productUrl.startsWith('http'));
+    if (hasValidUrls) {
+      logger.info({ productId: existing._id }, 'Serving product from cache');
+      const doc = existing.toObject() as IProduct;
+      doc.prices = applyAffiliateUrls(doc.prices);
+      return doc;
+    }
+    logger.info({ productId: existing._id }, 'Cache has prices without URLs, re-fetching');
   }
 
   // 2. Fetch from SerpApi
