@@ -19,12 +19,29 @@ const CACHE_MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
  * Apply affiliate URLs to every store price entry in-place and return the
  * modified array.  A new array is returned so the original DB document is
  * not mutated if callers hold a reference.
+ *
+ * We explicitly pick every field to ensure Mongoose subdocument properties
+ * survive the spread (toObject sometimes nests prototype-only getters).
  */
 function applyAffiliateUrls(prices: IStorePrice[]): IStorePrice[] {
-  return prices.map((p) => ({
-    ...p,
-    productUrl: buildAffiliateUrl(p.productUrl, p.marketplace),
-  }));
+  return prices.map((p) => {
+    // Ensure we have a plain object — guard against Mongoose sub-docs
+    const plain = typeof (p as any).toObject === 'function'
+      ? (p as any).toObject()
+      : p;
+
+    return {
+      marketplace: plain.marketplace,
+      storeName: plain.storeName,
+      storeLogo: plain.storeLogo || '',
+      price: plain.price,
+      currency: plain.currency,
+      productUrl: buildAffiliateUrl(plain.productUrl || '', plain.marketplace),
+      inStock: plain.inStock ?? true,
+      lastChecked: plain.lastChecked,
+      externalId: plain.externalId,
+    };
+  });
 }
 
 /**

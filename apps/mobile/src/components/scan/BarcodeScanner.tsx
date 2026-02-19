@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -20,11 +20,18 @@ export default function BarcodeScanner({ onBarcodeScanned, onClose }: BarcodeSca
   const { t } = useTranslation();
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
+  const [cameraError, setCameraError] = useState(false);
 
   const handleBarCodeScanned = (result: BarcodeScanningResult) => {
     if (scanned) return;
     setScanned(true);
-    onBarcodeScanned(result.data, result.type);
+    // Validate barcode data exists
+    if (result.data && result.data.trim().length > 0) {
+      onBarcodeScanned(result.data.trim(), result.type);
+    } else {
+      // Invalid scan — allow rescan
+      setScanned(false);
+    }
   };
 
   if (!permission) {
@@ -51,13 +58,30 @@ export default function BarcodeScanner({ onBarcodeScanned, onClose }: BarcodeSca
     );
   }
 
+  // Camera error fallback
+  if (cameraError) {
+    return (
+      <View style={styles.container}>
+        <FontAwesome name="exclamation-triangle" size={48} color={COLORS.warning} />
+        <Text style={styles.message}>{t('scan.cameraPermission')}</Text>
+        <Text style={styles.subMessage}>{t('scan.cameraPermissionMessage')}</Text>
+        <TouchableOpacity style={styles.permissionButton} onPress={() => setCameraError(false)}>
+          <Text style={styles.permissionButtonText}>{t('common.retry')}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <Text style={styles.closeButtonText}>{t('common.cancel')}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.cameraContainer}>
       <CameraView
         style={styles.camera}
         facing="back"
         barcodeScannerSettings={{
-          barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128', 'code39'],
+          barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128', 'code39', 'qr'],
         }}
         onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
       >

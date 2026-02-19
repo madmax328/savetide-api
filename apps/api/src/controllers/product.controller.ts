@@ -18,9 +18,9 @@ const searchQuerySchema = z.object({
 const barcodeParamSchema = z.object({
   code: z
     .string()
-    .min(8, 'Barcode must be at least 8 characters')
-    .max(20, 'Barcode must be at most 20 characters')
-    .regex(/^[0-9]+$/, 'Barcode must be numeric'),
+    .min(4, 'Barcode must be at least 4 characters')
+    .max(50, 'Barcode must be at most 50 characters')
+    .regex(/^[a-zA-Z0-9\-]+$/, 'Invalid barcode format'),
 });
 
 const barcodeQuerySchema = z.object({

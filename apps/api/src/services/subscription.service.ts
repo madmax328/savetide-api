@@ -4,10 +4,23 @@ import { env } from '../config/env';
 import { logger } from '../utils/logger';
 
 // ---------------------------------------------------------------------------
-// Stripe client — let Stripe infer the apiVersion from the installed package
+// Stripe client — lazy init, only when STRIPE_SECRET_KEY is set
 // ---------------------------------------------------------------------------
 
-const stripe = new Stripe(env.STRIPE_SECRET_KEY || 'sk_test_placeholder');
+const STRIPE_CONFIGURED = Boolean(env.STRIPE_SECRET_KEY && env.STRIPE_SECRET_KEY.length > 3);
+
+const stripe = STRIPE_CONFIGURED
+  ? new Stripe(env.STRIPE_SECRET_KEY)
+  : (null as unknown as Stripe);
+
+function requireStripe(): Stripe {
+  if (!STRIPE_CONFIGURED || !stripe) {
+    throw new Error(
+      'Stripe is not configured. Please set STRIPE_SECRET_KEY, STRIPE_PRICE_ID_EUR, and STRIPE_PRICE_ID_USD in your environment variables on Railway.',
+    );
+  }
+  return stripe;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -53,7 +66,7 @@ function getSubscriptionIdFromInvoice(invoice: Stripe.Invoice): string | null {
 
 function getAppBaseUrl(): string {
   return env.NODE_ENV === 'production'
-    ? 'https://api.savetide.com'
+    ? 'https://savetide-api-production.up.railway.app'
     : `http://localhost:${env.PORT}`;
 }
 
@@ -69,6 +82,8 @@ export async function createCheckoutSession(
   userId: string,
   country: string = 'FR',
 ): Promise<{ sessionId: string; url: string | null }> {
+  const s = requireStripe();
+
   const user = await User.findById(userId);
   if (!user) throw new Error('User not found');
 
@@ -76,7 +91,7 @@ export async function createCheckoutSession(
   let customerId = user.subscription.stripeCustomerId;
 
   if (!customerId) {
-    const customer = await stripe.customers.create({
+    const customer = await s.customers.create({
       email: user.email,
       name: `${user.firstName} ${user.lastName}`.trim() || undefined,
       metadata: { userId: user._id.toString() },
@@ -93,11 +108,11 @@ export async function createCheckoutSession(
   const priceId = country === 'US' ? env.STRIPE_PRICE_ID_USD : env.STRIPE_PRICE_ID_EUR;
 
   if (!priceId) {
-    throw new Error('Stripe price ID not configured for this country');
+    throw new Error('Stripe price ID not configured for this country. Set STRIPE_PRICE_ID_EUR and STRIPE_PRICE_ID_USD on Railway.');
   }
 
   // Create Checkout Session
-  const session = await stripe.checkout.sessions.create({
+  const session = await s.checkout.sessions.create({
     customer: customerId,
     mode: 'subscription',
     payment_method_types: ['card'],
@@ -137,13 +152,15 @@ export async function getSubscriptionStatus(userId: string) {
  * Cancel a subscription (at period end — user keeps premium until expiry).
  */
 export async function cancelSubscription(userId: string): Promise<void> {
+  const s = requireStripe();
+
   const user = await User.findById(userId);
   if (!user) throw new Error('User not found');
 
   const subId = user.subscription.stripeSubscriptionId;
   if (!subId) throw new Error('No active subscription');
 
-  await stripe.subscriptions.update(subId, {
+  await s.subscriptions.update(subId, {
     cancel_at_period_end: true,
   });
 
@@ -158,13 +175,15 @@ export async function cancelSubscription(userId: string): Promise<void> {
  * Reactivate a canceled subscription (undo cancel_at_period_end).
  */
 export async function reactivateSubscription(userId: string): Promise<void> {
+  const s = requireStripe();
+
   const user = await User.findById(userId);
   if (!user) throw new Error('User not found');
 
   const subId = user.subscription.stripeSubscriptionId;
   if (!subId) throw new Error('No subscription to reactivate');
 
-  await stripe.subscriptions.update(subId, {
+  await s.subscriptions.update(subId, {
     cancel_at_period_end: false,
   });
 
@@ -186,7 +205,8 @@ export function constructWebhookEvent(
   rawBody: Buffer,
   signature: string,
 ): Stripe.Event {
-  return stripe.webhooks.constructEvent(
+  const s = requireStripe();
+  return s.webhooks.constructEvent(
     rawBody,
     signature,
     env.STRIPE_WEBHOOK_SECRET,
@@ -230,6 +250,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
 // ---------------------------------------------------------------------------
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session): Promise<void> {
+  const s = requireStripe();
   const userId = session.metadata?.userId;
   if (!userId) {
     logger.warn({ sessionId: session.id }, 'Checkout completed without userId in metadata');
@@ -245,7 +266,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session): Promis
   }
 
   // Fetch subscription details from Stripe (includes items with period_end)
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+  const subscription = await s.subscriptions.retrieve(subscriptionId, {
     expand: ['items.data'],
   });
 
@@ -259,6 +280,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session): Promis
 }
 
 async function handleInvoicePaid(invoice: Stripe.Invoice): Promise<void> {
+  const s = requireStripe();
   const subscriptionId = getSubscriptionIdFromInvoice(invoice);
   if (!subscriptionId) return;
 
@@ -272,7 +294,7 @@ async function handleInvoicePaid(invoice: Stripe.Invoice): Promise<void> {
   }
 
   // Update period end from the subscription
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+  const subscription = await s.subscriptions.retrieve(subscriptionId, {
     expand: ['items.data'],
   });
 

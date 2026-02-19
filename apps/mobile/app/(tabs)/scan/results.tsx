@@ -75,10 +75,12 @@ export default function ResultsScreen() {
 
   const handleViewDeal = (url?: string) => {
     if (!url) {
-      Alert.alert(t('common.error'), 'No URL available for this deal.');
+      Alert.alert(t('common.error'), t('results.noUrl'));
       return;
     }
-    Linking.openURL(url);
+    Linking.openURL(url).catch(() => {
+      Alert.alert(t('common.error'), t('results.noUrl'));
+    });
   };
 
   if (isSearching) {
@@ -88,7 +90,7 @@ export default function ResultsScreen() {
         <SafeAreaView style={styles.container}>
           <View style={styles.centered}>
             <ActivityIndicator size="large" color={COLORS.primary} />
-            <Text style={styles.loadingText}>{t('common.loading')}</Text>
+            <Text style={styles.loadingText}>{t('results.searching')}</Text>
           </View>
         </SafeAreaView>
       </>
@@ -101,9 +103,17 @@ export default function ResultsScreen() {
         <Stack.Screen options={{ title: t('results.title'), headerShown: true }} />
         <SafeAreaView style={styles.container}>
           <View style={styles.centered}>
-            <FontAwesome name="search" size={48} color={COLORS.textMuted} />
+            <View style={styles.emptyIconCircle}>
+              <FontAwesome name="search" size={40} color={COLORS.textMuted} />
+            </View>
             <Text style={styles.emptyTitle}>{t('results.noResults')}</Text>
             {error && <Text style={styles.errorText}>{error}</Text>}
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={() => router.back()}
+            >
+              <Text style={styles.retryButtonText}>{t('results.newSearch')}</Text>
+            </TouchableOpacity>
           </View>
         </SafeAreaView>
       </>
@@ -111,6 +121,37 @@ export default function ResultsScreen() {
   }
 
   const sortedPrices = [...product.prices].sort((a, b) => a.price - b.price).slice(0, 10);
+  const bestPrice = sortedPrices.length > 0 ? sortedPrices[0].price : 0;
+  const worstPrice = sortedPrices.length > 0 ? sortedPrices[sortedPrices.length - 1].price : 0;
+  const maxSaving = worstPrice - bestPrice;
+  const currency = sortedPrices.length > 0 ? sortedPrices[0].currency : 'EUR';
+
+  const renderStatsBar = () => (
+    <View style={styles.statsBar}>
+      <View style={styles.statItem}>
+        <Text style={styles.statValue}>{sortedPrices.length}</Text>
+        <Text style={styles.statLabel}>{t('results.offersFound')}</Text>
+      </View>
+      <View style={styles.statDivider} />
+      <View style={styles.statItem}>
+        <Text style={[styles.statValue, { color: COLORS.success }]}>
+          {formatPrice(bestPrice, currency)}
+        </Text>
+        <Text style={styles.statLabel}>{t('results.bestPrice')}</Text>
+      </View>
+      {maxSaving > 0 && (
+        <>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={[styles.statValue, { color: COLORS.danger }]}>
+              {formatPrice(maxSaving, currency)}
+            </Text>
+            <Text style={styles.statLabel}>{t('results.maxSaving')}</Text>
+          </View>
+        </>
+      )}
+    </View>
+  );
 
   const renderPriceItem = ({ item, index }: { item: StorePrice; index: number }) => {
     const isBestPrice = index === 0;
@@ -120,39 +161,66 @@ export default function ResultsScreen() {
       <View style={[styles.priceCard, isBestPrice && styles.bestPriceCard]}>
         {isBestPrice && (
           <View style={styles.bestBadge}>
-            <FontAwesome name="trophy" size={12} color={COLORS.white} />
-            <Text style={styles.bestBadgeText}>{t('results.bestPrice')}</Text>
+            <FontAwesome name="trophy" size={11} color={COLORS.white} />
+            <Text style={styles.bestBadgeText}>{t('results.bestPrice').toUpperCase()}</Text>
           </View>
         )}
 
-        <View style={styles.priceRow}>
-          <View style={styles.storeInfo}>
-            <View style={[styles.storeIcon, { backgroundColor: storeConfig.color + '20' }]}>
-              <FontAwesome
-                name={storeConfig.icon as any}
-                size={20}
-                color={storeConfig.color}
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.storeName}>{storeConfig.displayName}</Text>
-              <Text style={[styles.stockStatus, !item.inStock && styles.outOfStock]}>
-                {item.inStock ? t('results.inStock') : t('results.outOfStock')}
-              </Text>
+        <View style={styles.cardContent}>
+          {/* Product thumbnail */}
+          <View style={styles.thumbnailContainer}>
+            {product.imageUrl ? (
+              <Image source={{ uri: product.imageUrl }} style={styles.thumbnail} />
+            ) : (
+              <View style={styles.thumbnailPlaceholder}>
+                <FontAwesome name="cube" size={24} color={COLORS.textMuted} />
+              </View>
+            )}
+          </View>
+
+          {/* Info */}
+          <View style={styles.cardInfo}>
+            <Text style={styles.cardTitle} numberOfLines={2}>
+              {product.name || query}
+            </Text>
+            <View style={styles.storeRow}>
+              <View style={[styles.storeChip, { backgroundColor: storeConfig.color + '15' }]}>
+                <FontAwesome name={storeConfig.icon as any} size={12} color={storeConfig.color} />
+                <Text style={[styles.storeChipText, { color: storeConfig.color }]}>
+                  {storeConfig.displayName}
+                </Text>
+              </View>
+              {!item.inStock && (
+                <Text style={styles.outOfStockText}>{t('results.outOfStock')}</Text>
+              )}
             </View>
           </View>
 
-          <View style={styles.priceSection}>
-            <Text style={[styles.price, isBestPrice && styles.bestPrice]}>
+          {/* Price + Button */}
+          <View style={styles.cardRight}>
+            <Text style={[styles.cardPrice, isBestPrice && styles.cardPriceBest]}>
               {formatPrice(item.price, item.currency)}
             </Text>
             <TouchableOpacity
-              style={[styles.viewButton, !item.inStock && styles.viewButtonDisabled]}
+              style={[
+                styles.viewButton,
+                isBestPrice && styles.viewButtonBest,
+                !item.inStock && styles.viewButtonDisabled,
+              ]}
               onPress={() => handleViewDeal(item.productUrl)}
               disabled={!item.inStock}
             >
-              <Text style={styles.viewButtonText}>{t('results.viewDeal')}</Text>
-              <FontAwesome name="external-link" size={12} color={COLORS.white} />
+              <Text style={[
+                styles.viewButtonText,
+                isBestPrice && styles.viewButtonTextBest,
+              ]}>
+                {t('results.viewDeal')}
+              </Text>
+              <FontAwesome
+                name="external-link"
+                size={10}
+                color={isBestPrice ? COLORS.white : COLORS.primary}
+              />
             </TouchableOpacity>
           </View>
         </View>
@@ -164,12 +232,16 @@ export default function ResultsScreen() {
     <>
       <Stack.Screen options={{ title: t('results.title'), headerShown: true }} />
       <SafeAreaView style={styles.container}>
+        {/* Stats bar */}
+        {renderStatsBar()}
+
+        {/* Product header */}
         <View style={styles.productHeader}>
           {product.imageUrl ? (
             <Image source={{ uri: product.imageUrl }} style={styles.productImage} />
           ) : (
             <View style={styles.productImagePlaceholder}>
-              <FontAwesome name="cube" size={40} color={COLORS.textMuted} />
+              <FontAwesome name="cube" size={28} color={COLORS.textMuted} />
             </View>
           )}
           <View style={styles.productInfo}>
@@ -179,12 +251,10 @@ export default function ResultsScreen() {
             {product.brand ? (
               <Text style={styles.productBrand}>{product.brand}</Text>
             ) : null}
-            <Text style={styles.resultCount}>
-              {sortedPrices.length} {t('results.prices')}
-            </Text>
           </View>
         </View>
 
+        {/* Price list */}
         <FlatList
           data={sortedPrices}
           renderItem={renderPriceItem}
@@ -194,24 +264,26 @@ export default function ResultsScreen() {
         />
 
         {/* Track button */}
-        <TouchableOpacity
-          style={[styles.trackButton, isTracked && styles.trackButtonTracked]}
-          onPress={handleTrackToggle}
-          disabled={isTrackLoading}
-        >
-          {isTrackLoading ? (
-            <ActivityIndicator size="small" color={COLORS.white} />
-          ) : (
-            <FontAwesome
-              name={isTracked ? 'heart' : 'heart-o'}
-              size={18}
-              color={COLORS.white}
-            />
-          )}
-          <Text style={styles.trackButtonText}>
-            {isTracked ? t('tracked.removeTracking') : t('results.trackProduct')}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.bottomBar}>
+          <TouchableOpacity
+            style={[styles.trackButton, isTracked && styles.trackButtonTracked]}
+            onPress={handleTrackToggle}
+            disabled={isTrackLoading}
+          >
+            {isTrackLoading ? (
+              <ActivityIndicator size="small" color={COLORS.white} />
+            ) : (
+              <FontAwesome
+                name={isTracked ? 'heart' : 'heart-o'}
+                size={16}
+                color={COLORS.white}
+              />
+            )}
+            <Text style={styles.trackButtonText}>
+              {isTracked ? t('tracked.removeTracking') : t('results.trackProduct')}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     </>
   );
@@ -232,6 +304,16 @@ const styles = StyleSheet.create({
   loadingText: {
     color: COLORS.textSecondary,
     fontSize: 16,
+    marginTop: SPACING.sm,
+  },
+  emptyIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: COLORS.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: SPACING.sm,
   },
   emptyTitle: {
     fontSize: 18,
@@ -244,47 +326,92 @@ const styles = StyleSheet.create({
     color: COLORS.danger,
     textAlign: 'center',
   },
+  retryButton: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.md,
+    marginTop: SPACING.sm,
+  },
+  retryButtonText: {
+    color: COLORS.white,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+
+  // Stats bar
+  statsBar: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.surface,
+    marginHorizontal: SPACING.md,
+    marginTop: SPACING.sm,
+    borderRadius: BORDER_RADIUS.md,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: COLORS.primary,
+  },
+  statLabel: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  statDivider: {
+    width: 1,
+    backgroundColor: COLORS.border,
+    marginVertical: 4,
+  },
+
+  // Product header
   productHeader: {
     flexDirection: 'row',
-    padding: SPACING.lg,
-    gap: SPACING.md,
+    padding: SPACING.md,
+    gap: SPACING.sm,
+    alignItems: 'center',
   },
   productImage: {
-    width: 80,
-    height: 80,
-    borderRadius: BORDER_RADIUS.md,
+    width: 56,
+    height: 56,
+    borderRadius: BORDER_RADIUS.sm,
     backgroundColor: COLORS.surface,
   },
   productImagePlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: BORDER_RADIUS.md,
+    width: 56,
+    height: 56,
+    borderRadius: BORDER_RADIUS.sm,
     backgroundColor: COLORS.surface,
     justifyContent: 'center',
     alignItems: 'center',
   },
   productInfo: {
     flex: 1,
-    justifyContent: 'center',
   },
   productName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: COLORS.text,
+    lineHeight: 20,
   },
   productBrand: {
-    fontSize: 14,
+    fontSize: 13,
     color: COLORS.textSecondary,
     marginTop: 2,
   },
-  resultCount: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    marginTop: SPACING.xs,
-  },
+
+  // Price list
   list: {
-    paddingHorizontal: SPACING.lg,
-    paddingBottom: 100,
+    paddingHorizontal: SPACING.md,
+    paddingBottom: 90,
   },
   priceCard: {
     backgroundColor: COLORS.surface,
@@ -297,92 +424,136 @@ const styles = StyleSheet.create({
   bestPriceCard: {
     borderColor: COLORS.success,
     borderWidth: 2,
+    backgroundColor: COLORS.success + '08',
   },
   bestBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.success,
     alignSelf: 'flex-start',
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 4,
-    borderRadius: BORDER_RADIUS.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
     gap: 4,
     marginBottom: SPACING.sm,
   },
   bestBadgeText: {
     color: COLORS.white,
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
-  priceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  storeInfo: {
+
+  // Card content
+  cardContent: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.sm,
-    flex: 1,
   },
-  storeIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  thumbnailContainer: {
+    width: 52,
+    height: 52,
+  },
+  thumbnail: {
+    width: 52,
+    height: 52,
+    borderRadius: 8,
+    backgroundColor: COLORS.surfaceLight,
+  },
+  thumbnailPlaceholder: {
+    width: 52,
+    height: 52,
+    borderRadius: 8,
     backgroundColor: COLORS.surfaceLight,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  storeName: {
-    fontSize: 16,
+  cardInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  cardTitle: {
+    fontSize: 13,
     fontWeight: '600',
     color: COLORS.text,
+    lineHeight: 17,
   },
-  stockStatus: {
-    fontSize: 12,
-    color: COLORS.success,
-    marginTop: 2,
+  storeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
-  outOfStock: {
-    color: COLORS.danger,
+  storeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    gap: 4,
   },
-  priceSection: {
-    alignItems: 'flex-end',
-    gap: SPACING.xs,
-  },
-  price: {
-    fontSize: 18,
+  storeChipText: {
+    fontSize: 11,
     fontWeight: '700',
+  },
+  outOfStockText: {
+    fontSize: 11,
+    color: COLORS.danger,
+    fontWeight: '600',
+  },
+  cardRight: {
+    alignItems: 'flex-end',
+    gap: 6,
+    minWidth: 90,
+  },
+  cardPrice: {
+    fontSize: 18,
+    fontWeight: '800',
     color: COLORS.text,
   },
-  bestPrice: {
+  cardPriceBest: {
     color: COLORS.success,
   },
   viewButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: COLORS.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 8,
+    gap: 4,
+  },
+  viewButtonBest: {
     backgroundColor: COLORS.primary,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 6,
-    borderRadius: BORDER_RADIUS.sm,
-    gap: 6,
+    borderColor: COLORS.primary,
   },
   viewButtonDisabled: {
-    opacity: 0.4,
+    opacity: 0.35,
   },
   viewButtonText: {
-    color: COLORS.white,
+    color: COLORS.primary,
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
+  },
+  viewButtonTextBest: {
+    color: COLORS.white,
+  },
+
+  // Bottom track button
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: SPACING.md,
+    paddingBottom: SPACING.lg,
+    paddingTop: SPACING.sm,
+    backgroundColor: COLORS.background,
   },
   trackButton: {
-    position: 'absolute',
-    bottom: 20,
-    left: SPACING.lg,
-    right: SPACING.lg,
     backgroundColor: COLORS.primary,
     borderRadius: BORDER_RADIUS.md,
-    padding: SPACING.md,
+    paddingVertical: 14,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
@@ -393,7 +564,7 @@ const styles = StyleSheet.create({
   },
   trackButtonText: {
     color: COLORS.white,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
   },
 });

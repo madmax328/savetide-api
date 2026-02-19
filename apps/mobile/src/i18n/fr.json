@@ -61,11 +61,16 @@
     "title": "Résultats",
     "bestPrice": "Meilleur prix",
     "prices": "prix trouvés",
-    "viewDeal": "Voir l'offre",
+    "offersFound": "offres",
+    "maxSaving": "Économie max",
+    "viewDeal": "Voir",
     "trackProduct": "Suivre ce produit",
     "noResults": "Aucun prix trouvé pour ce produit",
+    "noUrl": "Lien non disponible pour cette offre",
+    "searching": "Recherche des meilleurs prix...",
+    "newSearch": "Nouvelle recherche",
     "inStock": "En stock",
-    "outOfStock": "Rupture de stock",
+    "outOfStock": "Rupture",
     "lastChecked": "Vérifié"
   },
   "deals": {

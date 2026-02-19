@@ -59,6 +59,12 @@ export default function SubscriptionScreen() {
         fetchStatus();
         loadUser();
       }, 3000);
+    } else {
+      // Show error if no URL returned (Stripe not configured, etc.)
+      const { error } = useSubscriptionStore.getState();
+      if (error) {
+        Alert.alert(t('common.error'), error);
+      }
     }
   }, [country]);
 

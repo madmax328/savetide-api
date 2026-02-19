@@ -24,7 +24,7 @@ export default function ScanScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
-  const { searchByText, searchByBarcode, searchByImage, isSearching } = useScanStore();
+  const { searchByText, searchByBarcode, searchByImage, isSearching, error: scanError } = useScanStore();
   const { isLimitReached, incrementSearch, loadCount } = useFreeUsageStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [showScanner, setShowScanner] = useState(false);
@@ -55,51 +55,55 @@ export default function ScanScreen() {
   const handleSearch = useCallback(async () => {
     if (!searchQuery.trim()) return;
     if (!(await canSearch())) return;
-    try {
-      await searchByText(searchQuery.trim(), country);
-      router.push({
-        pathname: '/(tabs)/scan/results',
-        params: { query: searchQuery.trim(), type: 'text' },
-      });
-    } catch {
-      Alert.alert(t('common.error'), t('results.noResults'));
-    }
+    // The store catches errors internally and sets state.
+    // We always navigate to results — the results page handles error display.
+    await searchByText(searchQuery.trim(), country);
+    router.push({
+      pathname: '/(tabs)/scan/results',
+      params: { query: searchQuery.trim(), type: 'text' },
+    });
   }, [searchQuery, country, canSearch]);
 
-  const handleBarcodeScanned = useCallback(async (barcode: string, _type: string) => {
+  const handleBarcodeScanned = useCallback(async (barcode: string, barcodeType: string) => {
     setShowScanner(false);
     if (!(await canSearch())) return;
-    try {
-      await searchByBarcode(barcode, country);
-      router.push({
-        pathname: '/(tabs)/scan/results',
-        params: { query: barcode, type: 'barcode' },
-      });
-    } catch {
+
+    // Clean barcode — strip any non-alphanumeric chars
+    const cleanBarcode = barcode.replace(/[^a-zA-Z0-9]/g, '').trim();
+    if (!cleanBarcode) {
       Alert.alert(t('common.error'), t('results.noResults'));
+      return;
     }
+
+    // The store catches errors internally. Navigate to results always.
+    await searchByBarcode(cleanBarcode, country);
+    router.push({
+      pathname: '/(tabs)/scan/results',
+      params: { query: cleanBarcode, type: 'barcode' },
+    });
   }, [country, canSearch]);
 
   const handlePhotoSearch = useCallback(async () => {
     if (!(await canSearch())) return;
+
+    // Ask user: camera or gallery?
+    const choice = await new Promise<'camera' | 'gallery' | null>((resolve) => {
+      Alert.alert(
+        t('scan.takePhoto'),
+        undefined,
+        [
+          { text: t('common.cancel'), style: 'cancel', onPress: () => resolve(null) },
+          { text: t('scan.fromGallery'), onPress: () => resolve('gallery') },
+          { text: t('scan.fromCamera'), onPress: () => resolve('camera') },
+        ],
+      );
+    });
+
+    if (!choice) return;
+
+    let result: ImagePicker.ImagePickerResult;
+
     try {
-      // Ask user: camera or gallery?
-      const choice = await new Promise<'camera' | 'gallery' | null>((resolve) => {
-        Alert.alert(
-          t('scan.takePhoto'),
-          undefined,
-          [
-            { text: t('common.cancel'), style: 'cancel', onPress: () => resolve(null) },
-            { text: t('scan.fromGallery'), onPress: () => resolve('gallery') },
-            { text: t('scan.fromCamera'), onPress: () => resolve('camera') },
-          ],
-        );
-      });
-
-      if (!choice) return;
-
-      let result: ImagePicker.ImagePickerResult;
-
       if (choice === 'camera') {
         const { status } = await ImagePicker.requestCameraPermissionsAsync();
         if (status !== 'granted') {
@@ -108,8 +112,9 @@ export default function ScanScreen() {
         }
         result = await ImagePicker.launchCameraAsync({
           mediaTypes: ['images'],
-          quality: 0.7,
+          quality: 0.4, // Lower quality for smaller payload
           base64: true,
+          allowsEditing: false,
         });
       } else {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -119,8 +124,9 @@ export default function ScanScreen() {
         }
         result = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ['images'],
-          quality: 0.7,
+          quality: 0.4, // Lower quality for smaller payload
           base64: true,
+          allowsEditing: false,
         });
       }
 
@@ -128,12 +134,14 @@ export default function ScanScreen() {
 
       const base64 = `data:image/jpeg;base64,${result.assets[0].base64}`;
 
+      // The store catches errors internally. Navigate to results always.
       await searchByImage(base64, country);
       router.push({
         pathname: '/(tabs)/scan/results',
         params: { query: 'photo', type: 'image' },
       });
-    } catch {
+    } catch (err: any) {
+      console.warn('Photo search error:', err?.message || err);
       Alert.alert(t('common.error'), t('results.noResults'));
     }
   }, [country, canSearch]);
