@@ -55,19 +55,37 @@ export async function getTrackedProducts(
     .sort({ createdAt: -1 })
     .lean<TrackedProductWithProduct[]>();
 
-  // Apply affiliate URLs to each product's prices
+  // Apply affiliate URLs to each product's prices.
+  // After .populate().lean(), `t.productId` is the full product object.
+  // We must restore `productId` to a plain string ID and put the product data in `product`.
   return tracked.map((t) => {
     if (t.productId && typeof t.productId === 'object') {
       const prod = t.productId as unknown as TrackedProductWithProduct['product'];
+      // Extract the real ObjectId string from the populated object
+      const productIdStr = (prod as any)?._id?.toString() || '';
+
       if (prod && prod.prices) {
         prod.prices = prod.prices.map((p) => ({
           ...p,
           productUrl: buildAffiliateUrl(p.productUrl, p.marketplace),
         }));
       }
-      return { ...t, product: prod };
+
+      return {
+        _id: (t._id as any).toString(),
+        userId: t.userId.toString(),
+        productId: productIdStr,
+        targetPrice: t.targetPrice,
+        createdAt: t.createdAt,
+        updatedAt: t.updatedAt,
+        product: prod,
+      } as TrackedProductWithProduct;
     }
-    return { ...t, product: null };
+    return {
+      ...t,
+      productId: (t.productId as any)?.toString?.() || t.productId,
+      product: null,
+    } as TrackedProductWithProduct;
   });
 }
 

@@ -19,6 +19,9 @@ interface SerpApiShoppingResult {
   reviews?: number;
   extensions?: string[];
   product_id?: string;
+  // SerpApi sometimes returns these additional URL fields
+  second_hand_condition?: string;
+  snippet?: string;
 }
 
 interface SerpApiShoppingResponse {
@@ -238,30 +241,164 @@ function parseCurrency(priceString: string | undefined, country: string): 'EUR' 
 }
 
 /**
+ * Extract a direct merchant URL from a Google redirect/tracking URL.
+ *
+ * SerpApi Google Shopping `link` fields often look like:
+ *   https://www.google.com/url?q=https://www.amazon.fr/dp/B0x...&sa=...
+ *   https://www.google.fr/aclk?sa=...&adurl=https://www.fnac.com/...
+ *
+ * We extract the actual merchant URL from the `q`, `adurl`, or `url` param.
+ * If the URL is already a direct merchant link, we return it as-is.
+ */
+function extractDirectUrl(rawUrl: string): string {
+  if (!rawUrl || !rawUrl.startsWith('http')) return '';
+
+  try {
+    const parsed = new URL(rawUrl);
+    const hostname = parsed.hostname.replace(/^www\./, '');
+
+    // If NOT a Google redirect — it's already a merchant URL
+    if (!hostname.includes('google.')) {
+      return rawUrl;
+    }
+
+    // Try to extract the real merchant URL from known Google redirect params
+    const candidateParams = ['q', 'adurl', 'url', 'dest'];
+    for (const param of candidateParams) {
+      const value = parsed.searchParams.get(param);
+      if (value && value.startsWith('http')) {
+        return value;
+      }
+    }
+
+    // Some Google URLs embed the target URL as a path segment (e.g. /aclk)
+    // Check if there's a URL-encoded merchant URL in the full query string
+    const fullQuery = parsed.search;
+    const urlMatch = fullQuery.match(/(?:adurl|url|q|dest)=([^&]+)/);
+    if (urlMatch) {
+      const decoded = decodeURIComponent(urlMatch[1]);
+      if (decoded.startsWith('http') && !decoded.includes('google.')) {
+        return decoded;
+      }
+    }
+
+    // Fallback: return the original (even though it's Google, it will redirect)
+    return rawUrl;
+  } catch {
+    return rawUrl;
+  }
+}
+
+/**
  * Get the best available URL from a SerpApi shopping result.
- * Prefers direct retailer link, falls back to product_link (Google comparison).
+ * Extracts direct merchant URLs from Google redirect wrappers.
  */
 function getBestUrl(result: SerpApiShoppingResult): string {
+  // Try result.link first (usually present)
+  if (result.link) {
+    const directFromLink = extractDirectUrl(result.link);
+    if (directFromLink && !directFromLink.includes('google.')) {
+      return directFromLink;
+    }
+  }
+
+  // Try product_link (Google comparison page — may contain embedded merchant URL)
+  if (result.product_link) {
+    const directFromProduct = extractDirectUrl(result.product_link);
+    if (directFromProduct && !directFromProduct.includes('google.')) {
+      return directFromProduct;
+    }
+  }
+
+  // Last resort: return original link (Google redirect, will still work via browser)
+  // The Google redirect URL will at least work — the user's browser will follow it
   if (result.link && result.link.startsWith('http')) {
     return result.link;
   }
   if (result.product_link && result.product_link.startsWith('http')) {
     return result.product_link;
   }
+
   return '';
+}
+
+/**
+ * Build a search URL on the merchant's own website as a last-resort fallback.
+ * This is used when we have a store name but couldn't extract a direct product URL.
+ */
+function buildMerchantSearchUrl(storeName: string, productTitle: string): string {
+  const query = encodeURIComponent(productTitle);
+  const storeKey = storeName.toLowerCase();
+
+  const searchUrls: Record<string, string> = {
+    'amazon.fr': `https://www.amazon.fr/s?k=${query}`,
+    'amazon.com': `https://www.amazon.com/s?k=${query}`,
+    'cdiscount': `https://www.cdiscount.com/search/10/${query}.html`,
+    'fnac': `https://www.fnac.com/SearchResult/ResultList.aspx?Search=${query}`,
+    'darty': `https://www.darty.com/nav/recherche/${query}.html`,
+    'boulanger': `https://www.boulanger.com/resultats?tr=${query}`,
+    'walmart': `https://www.walmart.com/search?q=${query}`,
+    'target': `https://www.target.com/s?searchTerm=${query}`,
+    'bestbuy': `https://www.bestbuy.com/site/searchpage.jsp?st=${query}`,
+    'best buy': `https://www.bestbuy.com/site/searchpage.jsp?st=${query}`,
+    'ebay': `https://www.ebay.com/sch/i.html?_nkw=${query}`,
+    'ebay.com': `https://www.ebay.com/sch/i.html?_nkw=${query}`,
+    'ebay.fr': `https://www.ebay.fr/sch/i.html?_nkw=${query}`,
+    'newegg': `https://www.newegg.com/p/pl?d=${query}`,
+    'rakuten': `https://fr.shopping.rakuten.com/s/${query}`,
+    'carrefour': `https://www.carrefour.fr/s?q=${query}`,
+    'e.leclerc': `https://www.e.leclerc/recherche?q=${query}`,
+    'leclerc': `https://www.e.leclerc/recherche?q=${query}`,
+  };
+
+  // Try exact match first
+  if (searchUrls[storeKey]) return searchUrls[storeKey];
+
+  // Try partial match
+  for (const [key, url] of Object.entries(searchUrls)) {
+    if (storeKey.includes(key) || key.includes(storeKey)) {
+      return url;
+    }
+  }
+
+  // Generic Google Shopping fallback for this specific store
+  return `https://www.google.com/search?tbm=shop&q=${query}+site:${encodeURIComponent(storeName)}`;
 }
 
 function mapToStorePrice(result: SerpApiShoppingResult, country: string): IStorePrice | null {
   const price = result.extracted_price;
   if (price == null || price <= 0) return null;
 
-  const url = getBestUrl(result);
+  let url = getBestUrl(result);
   if (!url) {
     logger.warn({ source: result.source, title: result.title }, 'Skipping result — no URL');
     return null;
   }
 
+  // If the resolved URL is still a Google URL, build a merchant search URL instead
+  try {
+    const urlHost = new URL(url).hostname;
+    if (urlHost.includes('google.')) {
+      const merchantUrl = buildMerchantSearchUrl(result.source, result.title);
+      if (merchantUrl && !merchantUrl.includes('google.com/search')) {
+        logger.info({
+          store: result.source,
+          originalUrl: url.substring(0, 60),
+          merchantUrl: merchantUrl.substring(0, 80),
+        }, 'Replaced Google URL with merchant search URL');
+        url = merchantUrl;
+      }
+    }
+  } catch {
+    // URL parsing failed, keep original
+  }
+
   const marketplace = detectMarketplace(result.source, url);
+
+  logger.debug({
+    store: result.source,
+    resolvedUrl: url.substring(0, 100),
+  }, 'mapToStorePrice final URL');
 
   return {
     marketplace,
@@ -472,12 +609,42 @@ export async function searchByImage(
 
     let identifiedName = '';
 
+    // Strategy 1: Knowledge graph — most reliable identification
     if (lensResponse.knowledge_graph && lensResponse.knowledge_graph.length > 0) {
-      identifiedName = lensResponse.knowledge_graph[0]?.title ?? '';
+      const kg = lensResponse.knowledge_graph[0];
+      identifiedName = kg?.title ?? '';
+      // If there's a subtitle (often the brand/model), append it for better precision
+      if (kg?.subtitle && !identifiedName.toLowerCase().includes(kg.subtitle.toLowerCase())) {
+        identifiedName = `${identifiedName} ${kg.subtitle}`;
+      }
+      logger.info({ identifiedName, source: 'knowledge_graph' }, 'Lens identification');
     }
 
+    // Strategy 2: Analyze visual matches — find the most common product name
     if (!identifiedName && lensResponse.visual_matches && lensResponse.visual_matches.length > 0) {
-      identifiedName = lensResponse.visual_matches[0]?.title ?? '';
+      // Take up to 5 visual matches and find common words to build a better product name
+      const matches = lensResponse.visual_matches.slice(0, 5);
+      const titles = matches.map((m) => m.title).filter(Boolean) as string[];
+
+      logger.info({ titles }, 'Lens visual match titles');
+
+      if (titles.length > 0) {
+        // Use the first title that has a source from a known retailer (more reliable)
+        const retailerMatch = matches.find((m) => {
+          const src = (m.source || '').toLowerCase();
+          return ['amazon', 'fnac', 'cdiscount', 'darty', 'walmart', 'target', 'bestbuy',
+            'boulanger', 'rakuten', 'ebay', 'carrefour', 'leclerc'].some((r) => src.includes(r));
+        });
+
+        if (retailerMatch?.title) {
+          identifiedName = retailerMatch.title;
+          logger.info({ identifiedName, source: 'retailer_visual_match' }, 'Lens identification');
+        } else {
+          // Use the first visual match title
+          identifiedName = titles[0];
+          logger.info({ identifiedName, source: 'first_visual_match' }, 'Lens identification');
+        }
+      }
     }
 
     if (!identifiedName) {
@@ -485,7 +652,15 @@ export async function searchByImage(
       return { prices: [], rawTitle: '', rawThumbnail: '', identifiedName: '' };
     }
 
-    logger.info({ identifiedName }, 'Google Lens identified product');
+    // Clean up the identified name: remove store names, "buy at", price mentions
+    identifiedName = identifiedName
+      .replace(/\s*[-|:]?\s*(Amazon|Fnac|Cdiscount|Darty|Walmart|Target|eBay|Rakuten|Boulanger).*$/i, '')
+      .replace(/\s*(acheter|buy|prix|price|from|chez|sur)\s.*/i, '')
+      .replace(/\s*\d+[,.]?\d*\s*[€$£]\s*/g, '')
+      .replace(/\s*[€$£]\s*\d+[,.]?\d*/g, '')
+      .trim();
+
+    logger.info({ identifiedName }, 'Google Lens final identified product name');
 
     const shoppingResult = await searchGoogleShopping(identifiedName, country);
     return { ...shoppingResult, identifiedName };

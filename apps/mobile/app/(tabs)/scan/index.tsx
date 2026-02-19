@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Alert,
+  ScrollView,
+  Image,
 } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useRouter } from 'expo-router';
@@ -16,9 +18,12 @@ import * as ImagePicker from 'expo-image-picker';
 import { useAuthStore } from '../../../src/store/authStore';
 import { useScanStore } from '../../../src/store/scanStore';
 import { useFreeUsageStore } from '../../../src/store/freeUsageStore';
+import { useSearchHistoryStore } from '../../../src/store/searchHistoryStore';
+import type { SearchHistoryItem } from '../../../src/store/searchHistoryStore';
 import BarcodeScanner from '../../../src/components/scan/BarcodeScanner';
 import SignupWall from '../../../src/components/SignupWall';
 import { COLORS, SPACING, BORDER_RADIUS } from '../../../src/utils/constants';
+import { formatPrice } from '../../../src/utils/formatPrice';
 
 export default function ScanScreen() {
   const { t } = useTranslation();
@@ -26,17 +31,20 @@ export default function ScanScreen() {
   const { user, isAuthenticated } = useAuthStore();
   const { searchByText, searchByBarcode, searchByImage, isSearching, error: scanError } = useScanStore();
   const { isLimitReached, incrementSearch, loadCount } = useFreeUsageStore();
+  const { history, loadHistory, clearHistory } = useSearchHistoryStore();
   const isPremium = useAuthStore((state) => state.isPremium());
   const [searchQuery, setSearchQuery] = useState('');
   const [showScanner, setShowScanner] = useState(false);
+  const isNavigatingRef = useRef(false);
 
   const country = user?.country || 'FR';
 
-  // Load free usage count on mount
+  // Load free usage count and search history on mount
   useEffect(() => {
     if (!isAuthenticated) {
       loadCount();
     }
+    loadHistory();
   }, [isAuthenticated]);
 
   /**
@@ -54,18 +62,23 @@ export default function ScanScreen() {
   }, [isAuthenticated, isLimitReached]);
 
   const handleSearch = useCallback(async () => {
-    if (!searchQuery.trim()) return;
+    if (!searchQuery.trim() || isNavigatingRef.current) return;
     if (!(await canSearch())) return;
-    // The store catches errors internally and sets state.
-    // We always navigate to results — the results page handles error display.
-    await searchByText(searchQuery.trim(), country);
-    router.push({
-      pathname: '/(tabs)/scan/results',
-      params: { query: searchQuery.trim(), type: 'text' },
-    });
+    isNavigatingRef.current = true;
+    try {
+      await searchByText(searchQuery.trim(), country);
+      router.push({
+        pathname: '/(tabs)/scan/results',
+        params: { query: searchQuery.trim(), type: 'text' },
+      });
+    } finally {
+      // Reset after a short delay to allow navigation to complete
+      setTimeout(() => { isNavigatingRef.current = false; }, 1000);
+    }
   }, [searchQuery, country, canSearch]);
 
   const handleBarcodeScanned = useCallback(async (barcode: string, barcodeType: string) => {
+    if (isNavigatingRef.current) return;
     setShowScanner(false);
     if (!(await canSearch())) return;
 
@@ -76,15 +89,20 @@ export default function ScanScreen() {
       return;
     }
 
-    // The store catches errors internally. Navigate to results always.
-    await searchByBarcode(cleanBarcode, country);
-    router.push({
-      pathname: '/(tabs)/scan/results',
-      params: { query: cleanBarcode, type: 'barcode' },
-    });
+    isNavigatingRef.current = true;
+    try {
+      await searchByBarcode(cleanBarcode, country);
+      router.push({
+        pathname: '/(tabs)/scan/results',
+        params: { query: cleanBarcode, type: 'barcode' },
+      });
+    } finally {
+      setTimeout(() => { isNavigatingRef.current = false; }, 1000);
+    }
   }, [country, canSearch]);
 
   const handlePhotoSearch = useCallback(async () => {
+    if (isNavigatingRef.current) return;
     if (!(await canSearch())) return;
 
     // Ask user: camera or gallery?
@@ -135,15 +153,43 @@ export default function ScanScreen() {
 
       const base64 = `data:image/jpeg;base64,${result.assets[0].base64}`;
 
+      isNavigatingRef.current = true;
       // The store catches errors internally. Navigate to results always.
       await searchByImage(base64, country);
       router.push({
         pathname: '/(tabs)/scan/results',
         params: { query: 'photo', type: 'image' },
       });
+      setTimeout(() => { isNavigatingRef.current = false; }, 1000);
     } catch (err: any) {
+      isNavigatingRef.current = false;
       console.warn('Photo search error:', err?.message || err);
       Alert.alert(t('common.error'), t('results.noResults'));
+    }
+  }, [country, canSearch]);
+
+  const handleHistoryTap = useCallback(async (item: SearchHistoryItem) => {
+    if (isNavigatingRef.current) return;
+    if (!(await canSearch())) return;
+
+    isNavigatingRef.current = true;
+    try {
+      if (item.type === 'barcode') {
+        await searchByBarcode(item.query, country);
+        router.push({
+          pathname: '/(tabs)/scan/results',
+          params: { query: item.query, type: 'barcode' },
+        });
+      } else {
+        const query = item.productName || item.query;
+        await searchByText(query, country);
+        router.push({
+          pathname: '/(tabs)/scan/results',
+          params: { query, type: 'text' },
+        });
+      }
+    } finally {
+      setTimeout(() => { isNavigatingRef.current = false; }, 1000);
     }
   }, [country, canSearch]);
 
@@ -191,63 +237,125 @@ export default function ScanScreen() {
         ) : null}
       </View>
 
-      <View style={styles.content}>
-        <Text style={styles.logo}>SaveTide</Text>
-        <Text style={styles.subtitle}>{t('app.tagline')}</Text>
+      <ScrollView
+        style={styles.scrollContent}
+        contentContainerStyle={styles.scrollContentContainer}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.content}>
+          <Text style={styles.logo}>SaveTide</Text>
+          <Text style={styles.subtitle}>{t('app.tagline')}</Text>
 
-        <View style={styles.searchContainer}>
-          <FontAwesome name="search" size={18} color={COLORS.textMuted} style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder={t('scan.searchPlaceholder')}
-            placeholderTextColor={COLORS.textMuted}
-            returnKeyType="search"
-            onSubmitEditing={handleSearch}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <FontAwesome name="times-circle" size={18} color={COLORS.textMuted} />
+          <View style={styles.searchContainer}>
+            <FontAwesome name="search" size={18} color={COLORS.textMuted} style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder={t('scan.searchPlaceholder')}
+              placeholderTextColor={COLORS.textMuted}
+              returnKeyType="search"
+              onSubmitEditing={handleSearch}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <FontAwesome name="times-circle" size={18} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <Text style={styles.orText}>{t('scan.orSearch')}</Text>
+
+          <View style={styles.actions}>
+            <TouchableOpacity style={styles.actionButton} onPress={() => setShowScanner(true)}>
+              <View style={styles.iconCircle}>
+                <FontAwesome name="barcode" size={32} color={COLORS.primary} />
+              </View>
+              <Text style={styles.actionText}>{t('scan.scanBarcode')}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.actionButton} onPress={handlePhotoSearch}>
+              <View style={styles.iconCircle}>
+                <FontAwesome name="camera" size={32} color={COLORS.primary} />
+              </View>
+              <Text style={styles.actionText}>{t('scan.takePhoto')}</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Guest/Free user: show premium banner */}
+          {(!isAuthenticated || !isPremium) && (
+            <TouchableOpacity
+              style={styles.guestBanner}
+              onPress={() => {
+                if (!isAuthenticated) {
+                  router.push('/(auth)/register');
+                } else {
+                  router.push('/(tabs)/profile/subscription' as any);
+                }
+              }}
+            >
+              <FontAwesome name="star" size={14} color={COLORS.accent} />
+              <Text style={styles.guestBannerText}>{t('freeLimit.banner')}</Text>
             </TouchableOpacity>
           )}
         </View>
 
-        <Text style={styles.orText}>{t('scan.orSearch')}</Text>
-
-        <View style={styles.actions}>
-          <TouchableOpacity style={styles.actionButton} onPress={() => setShowScanner(true)}>
-            <View style={styles.iconCircle}>
-              <FontAwesome name="barcode" size={32} color={COLORS.primary} />
+        {/* Search History */}
+        {history.length > 0 && (
+          <View style={styles.historySection}>
+            <View style={styles.historyHeader}>
+              <Text style={styles.historySectionTitle}>{t('scan.recentSearches')}</Text>
+              <TouchableOpacity onPress={clearHistory}>
+                <Text style={styles.historyClearText}>{t('common.delete')}</Text>
+              </TouchableOpacity>
             </View>
-            <Text style={styles.actionText}>{t('scan.scanBarcode')}</Text>
-          </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionButton} onPress={handlePhotoSearch}>
-            <View style={styles.iconCircle}>
-              <FontAwesome name="camera" size={32} color={COLORS.primary} />
-            </View>
-            <Text style={styles.actionText}>{t('scan.takePhoto')}</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Guest/Free user: show premium banner */}
-        {(!isAuthenticated || !isPremium) && (
-          <TouchableOpacity
-            style={styles.guestBanner}
-            onPress={() => {
-              if (!isAuthenticated) {
-                router.push('/(auth)/register');
-              } else {
-                router.push('/(tabs)/profile/subscription' as any);
-              }
-            }}
-          >
-            <FontAwesome name="star" size={14} color={COLORS.accent} />
-            <Text style={styles.guestBannerText}>{t('freeLimit.banner')}</Text>
-          </TouchableOpacity>
+            {history.slice(0, 8).map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                style={styles.historyItem}
+                onPress={() => handleHistoryTap(item)}
+              >
+                {item.imageUrl ? (
+                  <Image source={{ uri: item.imageUrl }} style={styles.historyImage} />
+                ) : (
+                  <View style={styles.historyImagePlaceholder}>
+                    <FontAwesome
+                      name={item.type === 'barcode' ? 'barcode' : item.type === 'image' ? 'camera' : 'search'}
+                      size={16}
+                      color={COLORS.textMuted}
+                    />
+                  </View>
+                )}
+                <View style={styles.historyInfo}>
+                  <Text style={styles.historyName} numberOfLines={1}>
+                    {item.productName || item.query}
+                  </Text>
+                  <View style={styles.historyMeta}>
+                    <FontAwesome
+                      name={item.type === 'barcode' ? 'barcode' : item.type === 'image' ? 'camera' : 'search'}
+                      size={10}
+                      color={COLORS.textMuted}
+                    />
+                    <Text style={styles.historyQuery} numberOfLines={1}>
+                      {item.query.length > 30 ? item.query.substring(0, 30) + '...' : item.query}
+                    </Text>
+                  </View>
+                </View>
+                {item.lowestPrice ? (
+                  <Text style={styles.historyPrice}>
+                    {formatPrice(item.lowestPrice, item.currency || 'EUR')}
+                  </Text>
+                ) : null}
+                <FontAwesome name="chevron-right" size={12} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            ))}
+          </View>
         )}
-      </View>
+
+        <View style={{ height: SPACING.xxl }} />
+      </ScrollView>
 
       {/* Signup wall modal */}
       <SignupWall />
@@ -285,8 +393,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
-  content: {
+  scrollContent: {
     flex: 1,
+  },
+  scrollContentContainer: {
+    flexGrow: 1,
+  },
+  content: {
     paddingHorizontal: SPACING.lg,
     paddingTop: SPACING.lg,
     alignItems: 'center',
@@ -381,5 +494,76 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontSize: 13,
     fontWeight: '600',
+  },
+
+  // Search History
+  historySection: {
+    paddingHorizontal: SPACING.lg,
+    marginTop: SPACING.xl,
+  },
+  historyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  },
+  historySectionTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  historyClearText: {
+    fontSize: 13,
+    color: COLORS.textMuted,
+    fontWeight: '500',
+  },
+  historyItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.sm,
+    marginBottom: SPACING.xs,
+    gap: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  historyImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: COLORS.surfaceLight,
+  },
+  historyImagePlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: COLORS.surfaceLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  historyInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  historyName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  historyMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  historyQuery: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+  },
+  historyPrice: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.success,
+    marginRight: SPACING.xs,
   },
 });

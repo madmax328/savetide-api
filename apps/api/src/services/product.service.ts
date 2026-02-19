@@ -160,15 +160,23 @@ export async function searchProducts(
   });
 
   if (existing && isCacheFresh(existing)) {
-    // Verify cached data has valid URLs before serving
-    const hasValidUrls = existing.prices.some((p) => p.productUrl && p.productUrl.startsWith('http'));
-    if (hasValidUrls) {
+    // Verify cached data has valid URLs that are NOT Google redirect URLs
+    const hasDirectUrls = existing.prices.some((p) => {
+      if (!p.productUrl || !p.productUrl.startsWith('http')) return false;
+      try {
+        const host = new URL(p.productUrl).hostname;
+        return !host.includes('google.');
+      } catch {
+        return false;
+      }
+    });
+    if (hasDirectUrls) {
       logger.info({ productId: existing._id }, 'Serving product from cache');
       const doc = existing.toObject() as IProduct;
       doc.prices = applyAffiliateUrls(doc.prices);
       return doc;
     }
-    logger.info({ productId: existing._id }, 'Cache has prices without URLs, re-fetching');
+    logger.info({ productId: existing._id }, 'Cache has Google redirect URLs, re-fetching');
   }
 
   // 2. Fetch from SerpApi

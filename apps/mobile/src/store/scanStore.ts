@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import * as productService from '../services/productService';
 import type { Product } from '../services/productService';
+import { useSearchHistoryStore } from './searchHistoryStore';
 
 interface ScanState {
   product: Product | null;
@@ -26,6 +27,18 @@ export const useScanStore = create<ScanState>((set) => ({
     try {
       const data = await productService.searchProducts(query, country);
       set({ product: data.product, isSearching: false });
+
+      // Save to search history
+      if (data.product) {
+        useSearchHistoryStore.getState().addSearch({
+          query,
+          type: 'text',
+          productName: data.product.name,
+          imageUrl: data.product.imageUrl,
+          lowestPrice: data.product.lowestPrice,
+          currency: data.product.prices[0]?.currency,
+        });
+      }
     } catch (error: any) {
       const message = error.response?.data?.error || 'Search failed';
       set({ error: message, isSearching: false });
@@ -37,6 +50,18 @@ export const useScanStore = create<ScanState>((set) => ({
     try {
       const data = await productService.searchByBarcode(barcode, country);
       set({ product: data.product, isSearching: false });
+
+      // Save to search history
+      if (data.product) {
+        useSearchHistoryStore.getState().addSearch({
+          query: barcode,
+          type: 'barcode',
+          productName: data.product.name,
+          imageUrl: data.product.imageUrl,
+          lowestPrice: data.product.lowestPrice,
+          currency: data.product.prices[0]?.currency,
+        });
+      }
     } catch (error: any) {
       const message = error.response?.data?.error || 'Barcode search failed';
       set({ error: message, isSearching: false });
@@ -52,6 +77,18 @@ export const useScanStore = create<ScanState>((set) => ({
         identifiedName: data.identifiedName,
         isSearching: false,
       });
+
+      // Save to search history
+      if (data.product && data.identifiedName) {
+        useSearchHistoryStore.getState().addSearch({
+          query: data.identifiedName,
+          type: 'image',
+          productName: data.product.name,
+          imageUrl: data.product.imageUrl,
+          lowestPrice: data.product.lowestPrice,
+          currency: data.product.prices[0]?.currency,
+        });
+      }
     } catch (error: any) {
       const message = error.response?.data?.error || 'Image search failed';
       set({ error: message, isSearching: false });

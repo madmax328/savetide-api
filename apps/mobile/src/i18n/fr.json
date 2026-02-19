@@ -55,7 +55,8 @@
     "analyzing": "Analyse de l'image...",
     "cameraPermission": "Accès à la caméra nécessaire",
     "cameraPermissionMessage": "Autorisez l'accès à la caméra pour scanner les codes-barres",
-    "grantPermission": "Autoriser"
+    "grantPermission": "Autoriser",
+    "recentSearches": "Recherches récentes"
   },
   "results": {
     "title": "Résultats",

@@ -55,7 +55,8 @@
     "analyzing": "Analyzing image...",
     "cameraPermission": "Camera access required",
     "cameraPermissionMessage": "Allow camera access to scan barcodes",
-    "grantPermission": "Allow"
+    "grantPermission": "Allow",
+    "recentSearches": "Recent searches"
   },
   "results": {
     "title": "Results",

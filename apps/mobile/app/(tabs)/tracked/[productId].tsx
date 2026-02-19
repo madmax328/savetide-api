@@ -55,17 +55,29 @@ export default function ProductDetailScreen() {
   const [showAlertConfig, setShowAlertConfig] = useState(false);
 
   // Find the tracked product from the store
-  const trackedProduct = trackedProducts.find((tp) => tp.productId === productId);
+  const trackedProduct = trackedProducts.find(
+    (tp) => tp.productId === productId || (tp.productId as any)?._id === productId,
+  );
   const product = trackedProduct?.product;
 
-  // Load history and alerts on mount
+  // If tracked products aren't loaded yet, fetch them
+  const { fetchTracked } = useTrackingStore();
+  const [loadAttempted, setLoadAttempted] = useState(false);
+
+  // Load history, alerts, and ensure tracked products are loaded
   useEffect(() => {
     if (productId) {
       fetchHistory(productId, 30);
       fetchAlerts(productId);
+
+      // If product not found in store, re-fetch tracked products
+      if (!trackedProduct && !loadAttempted) {
+        setLoadAttempted(true);
+        fetchTracked();
+      }
     }
     return () => clearHistory();
-  }, [productId]);
+  }, [productId, trackedProduct, loadAttempted]);
 
   // Update target price input when tracked product loads
   useEffect(() => {
@@ -146,7 +158,22 @@ export default function ProductDetailScreen() {
         <Stack.Screen options={{ title: t('tracked.priceHistory'), headerShown: true }} />
         <SafeAreaView style={styles.container}>
           <View style={styles.centered}>
-            <ActivityIndicator size="large" color={COLORS.primary} />
+            {!loadAttempted ? (
+              <ActivityIndicator size="large" color={COLORS.primary} />
+            ) : (
+              <>
+                <FontAwesome name="exclamation-circle" size={40} color={COLORS.textMuted} />
+                <Text style={{ color: COLORS.textSecondary, fontSize: 16, marginTop: SPACING.md, textAlign: 'center' }}>
+                  {t('results.noResults')}
+                </Text>
+                <TouchableOpacity
+                  style={{ backgroundColor: COLORS.primary, paddingHorizontal: SPACING.xl, paddingVertical: SPACING.sm, borderRadius: BORDER_RADIUS.md, marginTop: SPACING.md }}
+                  onPress={() => router.back()}
+                >
+                  <Text style={{ color: COLORS.white, fontWeight: '700' }}>{t('common.back')}</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </SafeAreaView>
       </>
