@@ -16,8 +16,7 @@ import { COLORS, SPACING, BORDER_RADIUS } from '../../../src/utils/constants';
 export default function ProfileScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { user, logout, isPremium } = useAuthStore();
-  const premium = isPremium();
+  const { user, logout } = useAuthStore();
 
   const handleLogout = async () => {
     await logout();
@@ -39,41 +38,10 @@ export default function ProfileScreen() {
               </Text>
               <Text style={styles.userEmail}>{user?.email}</Text>
             </View>
-            <View style={[styles.statusBadge, premium && styles.premiumBadge]}>
-              <Text style={[styles.statusText, premium && styles.premiumText]}>
-                {premium ? t('profile.premium') : t('profile.free')}
-              </Text>
-            </View>
           </View>
-
-          {/* Subscription Card */}
-          {!premium && (
-            <TouchableOpacity
-              style={styles.upgradeCard}
-              onPress={() => router.push('/(tabs)/profile/subscription')}
-            >
-              <FontAwesome name="star" size={24} color={COLORS.accent} />
-              <View style={styles.upgradeInfo}>
-                <Text style={styles.upgradeTitle}>{t('profile.premiumFeatures')}</Text>
-                <Text style={styles.upgradeSubtitle}>
-                  {t('profile.feature1')} • {t('profile.feature2')} • {t('profile.feature3')}
-                </Text>
-              </View>
-              <FontAwesome name="chevron-right" size={16} color={COLORS.textMuted} />
-            </TouchableOpacity>
-          )}
 
           {/* Menu Items */}
           <View style={styles.menuSection}>
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => router.push('/(tabs)/profile/subscription')}
-            >
-              <FontAwesome name="credit-card" size={18} color={COLORS.textSecondary} />
-              <Text style={styles.menuText}>{t('profile.manageSubscription')}</Text>
-              <FontAwesome name="chevron-right" size={14} color={COLORS.textMuted} />
-            </TouchableOpacity>
-
             <TouchableOpacity
               style={styles.menuItem}
               onPress={() => router.push('/(tabs)/profile/settings')}
@@ -146,47 +114,6 @@ const styles = StyleSheet.create({
   },
   userEmail: {
     fontSize: 14,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-  statusBadge: {
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 4,
-    borderRadius: BORDER_RADIUS.sm,
-    backgroundColor: COLORS.surfaceLight,
-  },
-  premiumBadge: {
-    backgroundColor: COLORS.accent,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.textSecondary,
-  },
-  premiumText: {
-    color: COLORS.white,
-  },
-  upgradeCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.md,
-    padding: SPACING.md,
-    marginBottom: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.accent,
-    gap: SPACING.md,
-  },
-  upgradeInfo: {
-    flex: 1,
-  },
-  upgradeTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.text,
-  },
-  upgradeSubtitle: {
-    fontSize: 12,
     color: COLORS.textSecondary,
     marginTop: 2,
   },

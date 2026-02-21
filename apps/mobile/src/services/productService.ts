@@ -52,18 +52,3 @@ export async function getProductPrices(productId: string): Promise<StorePrice[]>
   return data.prices;
 }
 
-export interface ImageSearchResponse {
-  product: Product;
-  identifiedName: string;
-}
-
-export async function searchByImage(
-  imageBase64: string,
-  country: string = 'FR',
-): Promise<ImageSearchResponse> {
-  const { data } = await api.post('/products/image-search', {
-    imageBase64,
-    country,
-  });
-  return data;
-}

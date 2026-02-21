@@ -27,32 +27,32 @@ export default function ResultsScreen() {
   const router = useRouter();
   const { query, type } = useLocalSearchParams<{ query: string; type: string }>();
   const { product, isSearching, error } = useScanStore();
-  const isPremium = useAuthStore((state) => state.isPremium());
+  const { isAuthenticated } = useAuthStore();
   const { trackingStatus, track, untrack, checkTracking } = useTrackingStore();
   const [isTrackLoading, setIsTrackLoading] = useState(false);
 
   // Check tracking status when product loads
   useEffect(() => {
-    if (product?._id && isPremium) {
+    if (product?._id && isAuthenticated) {
       checkTracking(product._id);
     }
-  }, [product?._id, isPremium]);
+  }, [product?._id, isAuthenticated]);
 
   const isTracked = product?._id ? trackingStatus[product._id] === true : false;
 
   const handleTrackToggle = useCallback(async () => {
     if (!product?._id) return;
 
-    // Premium gate
-    if (!isPremium) {
+    // Auth gate — require login to track products
+    if (!isAuthenticated) {
       Alert.alert(
-        t('tracked.premiumRequired'),
-        t('tracked.premiumDescription'),
+        t('tracked.loginRequired'),
+        t('tracked.loginDescription'),
         [
           { text: t('common.cancel'), style: 'cancel' },
           {
-            text: t('tracked.subscribe'),
-            onPress: () => router.push('/(tabs)/profile/subscription'),
+            text: t('auth.signIn'),
+            onPress: () => router.push('/(auth)/login'),
           },
         ],
       );
@@ -71,7 +71,7 @@ export default function ResultsScreen() {
     } finally {
       setIsTrackLoading(false);
     }
-  }, [product?._id, isPremium, isTracked, t]);
+  }, [product?._id, isAuthenticated, isTracked, t]);
 
   const handleViewDeal = (url?: string) => {
     if (!url) {

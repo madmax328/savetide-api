@@ -96,6 +96,8 @@
     "emptyDescription": "Scan a product and add it to tracking to receive price drop alerts.",
     "premiumRequired": "Premium Feature",
     "premiumDescription": "Subscribe to track product prices and receive alerts.",
+    "loginRequired": "Sign in required",
+    "loginDescription": "Sign in to track product prices and receive price drop alerts.",
     "subscribe": "Subscribe",
     "removeTracking": "Remove from tracking",
     "priceHistory": "Price history",

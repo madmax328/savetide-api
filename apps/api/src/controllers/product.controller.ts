@@ -155,41 +155,6 @@ export async function getProductPrices(req: Request, res: Response): Promise<voi
 }
 
 /**
- * POST /products/image-search
- * Body: { imageBase64: "data:image/jpeg;base64,...", country?: "FR"|"US" }
- *    OR { imageUrl: "https://...", country?: "FR"|"US" }
- */
-export async function imageSearch(req: Request, res: Response): Promise<void> {
-  try {
-    const imageSearchSchema = z.object({
-      imageBase64: z.string().optional(),
-      imageUrl: z.string().url().optional(),
-      country: z.enum(['FR', 'US']).optional().default('FR'),
-    }).refine(
-      (data) => data.imageBase64 || data.imageUrl,
-      { message: 'Either imageBase64 or imageUrl is required' },
-    );
-
-    const { imageBase64, imageUrl, country } = imageSearchSchema.parse(req.body);
-
-    // Prefer direct URL, fallback to base64 data URI
-    const url = imageUrl || imageBase64!;
-
-    const { product, identifiedName } = await productService.searchByImage(url, country);
-
-    res.json({ product, identifiedName });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      res.status(400).json({ error: 'Validation error', details: error.errors });
-      return;
-    }
-
-    logger.error({ error }, 'Image search failed');
-    res.status(500).json({ error: 'Image search failed' });
-  }
-}
-
-/**
  * GET /products/:id/history?marketplace=amazon_fr&days=30
  * Requires premium subscription (enforced at route level).
  */

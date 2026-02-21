@@ -24,7 +24,7 @@ import type { TrackedProduct } from '../../../src/services/trackingService';
 export default function TrackedScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const isPremium = useAuthStore((state) => state.isPremium());
+  const { isAuthenticated } = useAuthStore();
   const {
     trackedProducts,
     isLoading,
@@ -33,12 +33,12 @@ export default function TrackedScreen() {
     untrack,
   } = useTrackingStore();
 
-  // Load tracked products on mount (premium only)
+  // Load tracked products on mount (authenticated users)
   useEffect(() => {
-    if (isPremium) {
+    if (isAuthenticated) {
       fetchTracked();
     }
-  }, [isPremium]);
+  }, [isAuthenticated]);
 
   const handleRefresh = useCallback(() => {
     fetchTracked();
@@ -63,21 +63,21 @@ export default function TrackedScreen() {
     router.push(`/(tabs)/tracked/${productId}` as any);
   }, []);
 
-  // Non-premium gate
-  if (!isPremium) {
+  // Auth gate — require login to track products
+  if (!isAuthenticated) {
     return (
       <>
         <Stack.Screen options={{ title: t('tracked.title'), headerShown: true }} />
         <SafeAreaView style={styles.container}>
           <View style={styles.premiumGate}>
-            <FontAwesome name="lock" size={48} color={COLORS.accent} />
-            <Text style={styles.premiumTitle}>{t('tracked.premiumRequired')}</Text>
-            <Text style={styles.premiumDescription}>{t('tracked.premiumDescription')}</Text>
+            <FontAwesome name="heart-o" size={48} color={COLORS.primary} />
+            <Text style={styles.premiumTitle}>{t('tracked.loginRequired')}</Text>
+            <Text style={styles.premiumDescription}>{t('tracked.loginDescription')}</Text>
             <TouchableOpacity
               style={styles.subscribeButton}
-              onPress={() => router.push('/(tabs)/profile/subscription')}
+              onPress={() => router.push('/(auth)/login')}
             >
-              <Text style={styles.subscribeButtonText}>{t('tracked.subscribe')}</Text>
+              <Text style={styles.subscribeButtonText}>{t('auth.signIn')}</Text>
             </TouchableOpacity>
           </View>
         </SafeAreaView>

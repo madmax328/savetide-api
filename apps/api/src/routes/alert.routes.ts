@@ -1,12 +1,11 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth.middleware';
-import { premiumMiddleware } from '../middleware/premium.middleware';
 import * as alertController from '../controllers/alert.controller';
 
 const router = Router();
 
-// All alert routes require authentication + premium subscription
-router.use(authMiddleware, premiumMiddleware);
+// All alert routes require authentication (free for all logged-in users)
+router.use(authMiddleware);
 
 // GET    /api/alerts?productId=xxx — list alerts
 router.get('/', alertController.getAlerts);

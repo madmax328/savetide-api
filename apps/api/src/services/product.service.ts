@@ -8,8 +8,12 @@ import * as serpapiService from './serpapi.service';
 // Constants
 // ---------------------------------------------------------------------------
 
-/** Cache freshness threshold — prices older than this trigger a re-fetch. */
-const CACHE_MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
+/**
+ * Cache freshness threshold — 24 hours.
+ * Each unique product is fetched from SerpApi ONCE per day max,
+ * regardless of how many users search for it.
+ */
+const CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -306,39 +310,7 @@ export async function getProductHistory(
   return history;
 }
 
-/**
- * Search by image — uses SerpApi Google Lens to identify the product,
- * then runs a shopping search with the identified name.
- *
- * Accepts either a public image URL or a base64-encoded data URI.
- */
-export async function searchByImage(
-  imageUrl: string,
-  country: string = 'FR',
-): Promise<{ product: IProduct; identifiedName: string }> {
-  logger.info({ country, imageUrlLength: imageUrl.length }, 'Image search requested');
-
-  // Call SerpApi Google Lens → identify product → Google Shopping
-  const { prices, rawTitle, rawThumbnail, identifiedName } =
-    await serpapiService.searchByImage(imageUrl, country);
-
-  if (!identifiedName) {
-    logger.warn('Google Lens could not identify the product');
-    const emptyProduct = await upsertProduct('unknown-product', country, [], '', '');
-    return { product: emptyProduct, identifiedName: '' };
-  }
-
-  // Persist
-  const product = await upsertProduct(identifiedName, country, prices, rawTitle, rawThumbnail);
-
-  // Record history
-  recordPriceHistory(product);
-
-  // Return with affiliate URLs
-  const result = product.toObject() as IProduct;
-  result.prices = applyAffiliateUrls(result.prices);
-  return { product: result, identifiedName };
-}
+// Image search removed — feature deprecated to reduce SerpApi costs.
 
 // ---------------------------------------------------------------------------
 // Utilities

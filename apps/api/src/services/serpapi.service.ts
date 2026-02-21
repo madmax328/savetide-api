@@ -2,6 +2,7 @@ import { getJson } from 'serpapi';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
 import { IStorePrice } from '../models/Product';
+import { resolveBarcode } from './barcode.service';
 
 // ---------------------------------------------------------------------------
 // Types for SerpApi responses
@@ -30,19 +31,7 @@ interface SerpApiShoppingResponse {
   error?: string;
 }
 
-interface SerpApiLensVisualMatch {
-  title?: string;
-  link?: string;
-  source?: string;
-  thumbnail?: string;
-}
-
-interface SerpApiLensResponse {
-  visual_matches?: SerpApiLensVisualMatch[];
-  knowledge_graph?: Array<{ title?: string; subtitle?: string }>;
-  search_metadata?: { status: string; id: string };
-  error?: string;
-}
+// Google Lens types removed — image search deprecated.
 
 // ---------------------------------------------------------------------------
 // Excluded low-quality marketplaces
@@ -505,9 +494,13 @@ export async function searchGoogleShopping(
 /**
  * Search by barcode / EAN / UPC.
  *
- * Strategy: first look up the barcode on regular Google Search to find the
- * actual product name, then search Google Shopping with that name.
- * This gives much better results than searching Shopping with a raw number.
+ * Strategy (cost-optimised):
+ *   1. Try FREE barcode APIs (UPCitemdb, Open Food Facts) → product name
+ *   2. If free APIs fail, fall back to SerpApi Google Search (1 SerpApi credit)
+ *   3. Search Google Shopping with the resolved name (1 SerpApi credit)
+ *
+ * Best case: 1 SerpApi credit (Shopping only).
+ * Worst case: 2 SerpApi credits (Google Search + Shopping).
  */
 export async function searchByBarcode(
   barcode: string,
@@ -517,13 +510,24 @@ export async function searchByBarcode(
   rawTitle: string;
   rawThumbnail: string;
 }> {
-  logger.info({ barcode, country }, 'SerpApi barcode search');
+  logger.info({ barcode, country }, 'Barcode search');
 
+  // ── Step 1: Try FREE barcode resolution ───────────────────────────
+  try {
+    const freeResult = await resolveBarcode(barcode);
+    if (freeResult && freeResult.productName.length > 3) {
+      logger.info({ barcode, productName: freeResult.productName, source: 'free_api' }, 'Barcode resolved for free');
+      return searchGoogleShopping(freeResult.productName, country);
+    }
+  } catch (error) {
+    logger.debug({ error, barcode }, 'Free barcode lookup failed');
+  }
+
+  // ── Step 2: Fall back to SerpApi Google Search (costs 1 credit) ───
   const gl = country === 'FR' ? 'fr' : 'us';
   const hl = country === 'FR' ? 'fr' : 'en';
 
   try {
-    // Step 1: Google search to resolve barcode → product name
     const googleResponse = await getJson({
       engine: 'google',
       q: barcode,
@@ -538,7 +542,7 @@ export async function searchByBarcode(
     // Try knowledge graph first (most reliable)
     if (googleResponse.knowledge_graph?.title) {
       productName = googleResponse.knowledge_graph.title;
-      logger.info({ barcode, productName, source: 'knowledge_graph' }, 'Barcode resolved');
+      logger.info({ barcode, productName, source: 'serpapi_knowledge_graph' }, 'Barcode resolved');
     }
     // Try organic results
     else if (googleResponse.organic_results?.[0]?.title) {
@@ -547,7 +551,7 @@ export async function searchByBarcode(
         .replace(/\s*[-|:]\s*Achat\s*.*/i, '')
         .replace(/\s*[-|:]\s*Prix\s*.*/i, '')
         .trim();
-      logger.info({ barcode, productName, source: 'organic_results' }, 'Barcode resolved');
+      logger.info({ barcode, productName, source: 'serpapi_organic' }, 'Barcode resolved');
     }
 
     if (productName && productName.length > 3) {
@@ -563,162 +567,4 @@ export async function searchByBarcode(
   }
 }
 
-/**
- * Search by image.
- *
- * SerpApi Google Lens requires a PUBLICLY ACCESSIBLE URL (not base64).
- * Since we receive base64 from the mobile app, we need to upload it first.
- * For now we upload to imgbb (free, no auth needed for small images).
- * If that fails, we return empty results.
- */
-export async function searchByImage(
-  imageUrl: string,
-  country: string = 'FR',
-): Promise<{
-  prices: IStorePrice[];
-  rawTitle: string;
-  rawThumbnail: string;
-  identifiedName: string;
-}> {
-  logger.info({ country, isBase64: imageUrl.startsWith('data:') }, 'Image search requested');
-
-  let publicUrl = imageUrl;
-
-  // If base64, upload to get a public URL
-  if (imageUrl.startsWith('data:')) {
-    try {
-      publicUrl = await uploadBase64ToPublicUrl(imageUrl);
-      logger.info({ publicUrl: publicUrl.substring(0, 80) }, 'Image uploaded for Lens');
-    } catch (uploadError) {
-      logger.error({ error: uploadError }, 'Failed to upload image for Google Lens');
-      return { prices: [], rawTitle: '', rawThumbnail: '', identifiedName: '' };
-    }
-  }
-
-  try {
-    const lensResponse = (await getJson({
-      engine: 'google_lens',
-      url: publicUrl,
-      api_key: env.SERPAPI_KEY,
-    })) as SerpApiLensResponse;
-
-    if (lensResponse.error) {
-      logger.error({ error: lensResponse.error }, 'SerpApi Lens returned an error');
-      throw new Error(`SerpApi Lens error: ${lensResponse.error}`);
-    }
-
-    let identifiedName = '';
-
-    // Strategy 1: Knowledge graph — most reliable identification
-    if (lensResponse.knowledge_graph && lensResponse.knowledge_graph.length > 0) {
-      const kg = lensResponse.knowledge_graph[0];
-      identifiedName = kg?.title ?? '';
-      // If there's a subtitle (often the brand/model), append it for better precision
-      if (kg?.subtitle && !identifiedName.toLowerCase().includes(kg.subtitle.toLowerCase())) {
-        identifiedName = `${identifiedName} ${kg.subtitle}`;
-      }
-      logger.info({ identifiedName, source: 'knowledge_graph' }, 'Lens identification');
-    }
-
-    // Strategy 2: Analyze visual matches — find the most common product name
-    if (!identifiedName && lensResponse.visual_matches && lensResponse.visual_matches.length > 0) {
-      // Take up to 5 visual matches and find common words to build a better product name
-      const matches = lensResponse.visual_matches.slice(0, 5);
-      const titles = matches.map((m) => m.title).filter(Boolean) as string[];
-
-      logger.info({ titles }, 'Lens visual match titles');
-
-      if (titles.length > 0) {
-        // Use the first title that has a source from a known retailer (more reliable)
-        const retailerMatch = matches.find((m) => {
-          const src = (m.source || '').toLowerCase();
-          return ['amazon', 'fnac', 'cdiscount', 'darty', 'walmart', 'target', 'bestbuy',
-            'boulanger', 'rakuten', 'ebay', 'carrefour', 'leclerc'].some((r) => src.includes(r));
-        });
-
-        if (retailerMatch?.title) {
-          identifiedName = retailerMatch.title;
-          logger.info({ identifiedName, source: 'retailer_visual_match' }, 'Lens identification');
-        } else {
-          // Use the first visual match title
-          identifiedName = titles[0];
-          logger.info({ identifiedName, source: 'first_visual_match' }, 'Lens identification');
-        }
-      }
-    }
-
-    if (!identifiedName) {
-      logger.warn('Google Lens could not identify product from image');
-      return { prices: [], rawTitle: '', rawThumbnail: '', identifiedName: '' };
-    }
-
-    // Clean up the identified name: remove store names, "buy at", price mentions
-    identifiedName = identifiedName
-      .replace(/\s*[-|:]?\s*(Amazon|Fnac|Cdiscount|Darty|Walmart|Target|eBay|Rakuten|Boulanger).*$/i, '')
-      .replace(/\s*(acheter|buy|prix|price|from|chez|sur)\s.*/i, '')
-      .replace(/\s*\d+[,.]?\d*\s*[€$£]\s*/g, '')
-      .replace(/\s*[€$£]\s*\d+[,.]?\d*/g, '')
-      .trim();
-
-    logger.info({ identifiedName }, 'Google Lens final identified product name');
-
-    const shoppingResult = await searchGoogleShopping(identifiedName, country);
-    return { ...shoppingResult, identifiedName };
-  } catch (error) {
-    logger.error({ error }, 'SerpApi Google Lens request failed');
-    throw error;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Image upload helper
-// ---------------------------------------------------------------------------
-
-/**
- * Upload a base64 image to imgbb (free image hosting) to get a public URL.
- * This is needed because SerpApi Google Lens requires a public URL.
- */
-async function uploadBase64ToPublicUrl(dataUri: string): Promise<string> {
-  // Extract raw base64 (remove data:image/...;base64, prefix)
-  const base64Data = dataUri.replace(/^data:image\/[a-z]+;base64,/, '');
-
-  // Use imgbb free API (no key needed for anonymous uploads)
-  // Alternative: we can use a simple POST to a free service
-  const formData = new URLSearchParams();
-  formData.append('image', base64Data);
-
-  const response = await fetch('https://api.imgbb.com/1/upload?key=00000000000000000000000000000000', {
-    method: 'POST',
-    body: formData,
-  });
-
-  if (!response.ok) {
-    // Fallback: try freeimage.host
-    const fallbackForm = new URLSearchParams();
-    fallbackForm.append('source', base64Data);
-    fallbackForm.append('type', 'base64');
-    fallbackForm.append('action', 'upload');
-
-    const fallbackResponse = await fetch('https://freeimage.host/api/1/upload?key=6d207e02198a847aa98d0a2a901485a5', {
-      method: 'POST',
-      body: fallbackForm,
-    });
-
-    if (!fallbackResponse.ok) {
-      throw new Error('Failed to upload image to any hosting service');
-    }
-
-    const fallbackData = await fallbackResponse.json() as any;
-    if (fallbackData?.image?.url) {
-      return fallbackData.image.url as string;
-    }
-    throw new Error('No URL in freeimage response');
-  }
-
-  const data = await response.json() as any;
-  if (data?.data?.url) {
-    return data.data.url as string;
-  }
-
-  throw new Error('No URL in imgbb response');
-}
+// Image search (Google Lens) removed — feature deprecated to reduce costs.

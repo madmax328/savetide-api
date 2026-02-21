@@ -527,6 +527,22 @@ img {
   transform: translateY(-2px);
 }
 
+.store-button-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.store-button-disabled:hover {
+  transform: none;
+}
+
+.download-note {
+  font-size: 14px !important;
+  color: var(--text-muted) !important;
+  margin-top: 24px !important;
+  font-style: italic;
+}
+
 .store-button .store-icon {
   font-size: 28px;
 }

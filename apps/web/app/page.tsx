@@ -30,7 +30,7 @@ export default function Home() {
         <div className="hero-inner">
           <div className="hero-badge">
             <span className="dot" />
-            Disponible sur iOS et Android
+            Disponible en beta sur iOS (TestFlight)
           </div>
 
           <h1>
@@ -272,21 +272,30 @@ export default function Home() {
           meilleurs prix des aujourd&apos;hui.
         </p>
         <div className="cta-buttons">
-          <button className="store-button">
+          <a
+            href="https://testflight.apple.com/join/PLACEHOLDER"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="store-button"
+          >
             <span className="store-icon">🍎</span>
             <span className="store-label">
-              <small>Telecharger sur l&apos;</small>
-              App Store
+              <small>Tester sur iOS via</small>
+              TestFlight
             </span>
-          </button>
-          <button className="store-button">
+          </a>
+          <button className="store-button store-button-disabled" disabled>
             <span className="store-icon">▶️</span>
             <span className="store-label">
-              <small>Disponible sur</small>
+              <small>Bientot sur</small>
               Google Play
             </span>
           </button>
         </div>
+        <p className="download-note">
+          L&apos;application est actuellement en beta. Testez-la gratuitement
+          sur iOS via TestFlight.
+        </p>
       </section>
 
       {/* ─── Footer ─────────────────────────────────────────── */}

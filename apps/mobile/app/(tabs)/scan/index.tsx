@@ -14,14 +14,11 @@ import {
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import * as ImagePicker from 'expo-image-picker';
 import { useAuthStore } from '../../../src/store/authStore';
 import { useScanStore } from '../../../src/store/scanStore';
-import { useFreeUsageStore } from '../../../src/store/freeUsageStore';
 import { useSearchHistoryStore } from '../../../src/store/searchHistoryStore';
 import type { SearchHistoryItem } from '../../../src/store/searchHistoryStore';
 import BarcodeScanner from '../../../src/components/scan/BarcodeScanner';
-import SignupWall from '../../../src/components/SignupWall';
 import { COLORS, SPACING, BORDER_RADIUS } from '../../../src/utils/constants';
 import { formatPrice } from '../../../src/utils/formatPrice';
 
@@ -29,41 +26,21 @@ export default function ScanScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
-  const { searchByText, searchByBarcode, searchByImage, isSearching, error: scanError } = useScanStore();
-  const { isLimitReached, incrementSearch, loadCount } = useFreeUsageStore();
+  const { searchByText, searchByBarcode, isSearching } = useScanStore();
   const { history, loadHistory, clearHistory } = useSearchHistoryStore();
-  const isPremium = useAuthStore((state) => state.isPremium());
   const [searchQuery, setSearchQuery] = useState('');
   const [showScanner, setShowScanner] = useState(false);
   const isNavigatingRef = useRef(false);
 
   const country = user?.country || 'FR';
 
-  // Load free usage count and search history on mount
+  // Load search history on mount
   useEffect(() => {
-    if (!isAuthenticated) {
-      loadCount();
-    }
     loadHistory();
-  }, [isAuthenticated]);
-
-  /**
-   * Check if the user can search (authenticated = unlimited, guest = 3 free).
-   * Returns true if allowed, shows wall if not.
-   */
-  const canSearch = useCallback(async (): Promise<boolean> => {
-    if (isAuthenticated) return true;
-    if (isLimitReached) {
-      useFreeUsageStore.setState({ showSignupWall: true });
-      return false;
-    }
-    const allowed = await incrementSearch();
-    return allowed;
-  }, [isAuthenticated, isLimitReached]);
+  }, []);
 
   const handleSearch = useCallback(async () => {
     if (!searchQuery.trim() || isNavigatingRef.current) return;
-    if (!(await canSearch())) return;
     isNavigatingRef.current = true;
     try {
       await searchByText(searchQuery.trim(), country);
@@ -72,15 +49,13 @@ export default function ScanScreen() {
         params: { query: searchQuery.trim(), type: 'text' },
       });
     } finally {
-      // Reset after a short delay to allow navigation to complete
       setTimeout(() => { isNavigatingRef.current = false; }, 1000);
     }
-  }, [searchQuery, country, canSearch]);
+  }, [searchQuery, country]);
 
   const handleBarcodeScanned = useCallback(async (barcode: string, barcodeType: string) => {
     if (isNavigatingRef.current) return;
     setShowScanner(false);
-    if (!(await canSearch())) return;
 
     // Clean barcode — strip any non-alphanumeric chars
     const cleanBarcode = barcode.replace(/[^a-zA-Z0-9]/g, '').trim();
@@ -99,78 +74,10 @@ export default function ScanScreen() {
     } finally {
       setTimeout(() => { isNavigatingRef.current = false; }, 1000);
     }
-  }, [country, canSearch]);
-
-  const handlePhotoSearch = useCallback(async () => {
-    if (isNavigatingRef.current) return;
-    if (!(await canSearch())) return;
-
-    // Ask user: camera or gallery?
-    const choice = await new Promise<'camera' | 'gallery' | null>((resolve) => {
-      Alert.alert(
-        t('scan.takePhoto'),
-        undefined,
-        [
-          { text: t('common.cancel'), style: 'cancel', onPress: () => resolve(null) },
-          { text: t('scan.fromGallery'), onPress: () => resolve('gallery') },
-          { text: t('scan.fromCamera'), onPress: () => resolve('camera') },
-        ],
-      );
-    });
-
-    if (!choice) return;
-
-    let result: ImagePicker.ImagePickerResult;
-
-    try {
-      if (choice === 'camera') {
-        const { status } = await ImagePicker.requestCameraPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert(t('common.error'), t('scan.cameraPermissionMessage'));
-          return;
-        }
-        result = await ImagePicker.launchCameraAsync({
-          mediaTypes: ['images'],
-          quality: 0.4, // Lower quality for smaller payload
-          base64: true,
-          allowsEditing: false,
-        });
-      } else {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert(t('common.error'), t('scan.cameraPermissionMessage'));
-          return;
-        }
-        result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ['images'],
-          quality: 0.4, // Lower quality for smaller payload
-          base64: true,
-          allowsEditing: false,
-        });
-      }
-
-      if (result.canceled || !result.assets?.[0]?.base64) return;
-
-      const base64 = `data:image/jpeg;base64,${result.assets[0].base64}`;
-
-      isNavigatingRef.current = true;
-      // The store catches errors internally. Navigate to results always.
-      await searchByImage(base64, country);
-      router.push({
-        pathname: '/(tabs)/scan/results',
-        params: { query: 'photo', type: 'image' },
-      });
-      setTimeout(() => { isNavigatingRef.current = false; }, 1000);
-    } catch (err: any) {
-      isNavigatingRef.current = false;
-      console.warn('Photo search error:', err?.message || err);
-      Alert.alert(t('common.error'), t('results.noResults'));
-    }
-  }, [country, canSearch]);
+  }, [country]);
 
   const handleHistoryTap = useCallback(async (item: SearchHistoryItem) => {
     if (isNavigatingRef.current) return;
-    if (!(await canSearch())) return;
 
     isNavigatingRef.current = true;
     try {
@@ -191,7 +98,7 @@ export default function ScanScreen() {
     } finally {
       setTimeout(() => { isNavigatingRef.current = false; }, 1000);
     }
-  }, [country, canSearch]);
+  }, [country]);
 
   if (showScanner) {
     return (
@@ -215,10 +122,10 @@ export default function ScanScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Top bar with action buttons */}
+      {/* Top bar with sign-in button for guests */}
       <View style={styles.topBar}>
         <View style={{ flex: 1 }} />
-        {!isAuthenticated ? (
+        {!isAuthenticated && (
           <TouchableOpacity
             style={styles.topButton}
             onPress={() => router.push('/(auth)/login')}
@@ -226,15 +133,7 @@ export default function ScanScreen() {
             <FontAwesome name="sign-in" size={14} color={COLORS.white} />
             <Text style={styles.topButtonText}>{t('auth.signIn')}</Text>
           </TouchableOpacity>
-        ) : !isPremium ? (
-          <TouchableOpacity
-            style={[styles.topButton, styles.premiumButton]}
-            onPress={() => router.push('/(tabs)/profile/subscription' as any)}
-          >
-            <FontAwesome name="star" size={14} color={COLORS.white} />
-            <Text style={styles.topButtonText}>Premium</Text>
-          </TouchableOpacity>
-        ) : null}
+        )}
       </View>
 
       <ScrollView
@@ -267,38 +166,12 @@ export default function ScanScreen() {
 
           <Text style={styles.orText}>{t('scan.orSearch')}</Text>
 
-          <View style={styles.actions}>
-            <TouchableOpacity style={styles.actionButton} onPress={() => setShowScanner(true)}>
-              <View style={styles.iconCircle}>
-                <FontAwesome name="barcode" size={32} color={COLORS.primary} />
-              </View>
-              <Text style={styles.actionText}>{t('scan.scanBarcode')}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.actionButton} onPress={handlePhotoSearch}>
-              <View style={styles.iconCircle}>
-                <FontAwesome name="camera" size={32} color={COLORS.primary} />
-              </View>
-              <Text style={styles.actionText}>{t('scan.takePhoto')}</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Guest/Free user: show premium banner */}
-          {(!isAuthenticated || !isPremium) && (
-            <TouchableOpacity
-              style={styles.guestBanner}
-              onPress={() => {
-                if (!isAuthenticated) {
-                  router.push('/(auth)/register');
-                } else {
-                  router.push('/(tabs)/profile/subscription' as any);
-                }
-              }}
-            >
-              <FontAwesome name="star" size={14} color={COLORS.accent} />
-              <Text style={styles.guestBannerText}>{t('freeLimit.banner')}</Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity style={styles.scanButton} onPress={() => setShowScanner(true)}>
+            <View style={styles.iconCircle}>
+              <FontAwesome name="barcode" size={32} color={COLORS.primary} />
+            </View>
+            <Text style={styles.actionText}>{t('scan.scanBarcode')}</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Search History */}
@@ -322,7 +195,7 @@ export default function ScanScreen() {
                 ) : (
                   <View style={styles.historyImagePlaceholder}>
                     <FontAwesome
-                      name={item.type === 'barcode' ? 'barcode' : item.type === 'image' ? 'camera' : 'search'}
+                      name={item.type === 'barcode' ? 'barcode' : 'search'}
                       size={16}
                       color={COLORS.textMuted}
                     />
@@ -334,7 +207,7 @@ export default function ScanScreen() {
                   </Text>
                   <View style={styles.historyMeta}>
                     <FontAwesome
-                      name={item.type === 'barcode' ? 'barcode' : item.type === 'image' ? 'camera' : 'search'}
+                      name={item.type === 'barcode' ? 'barcode' : 'search'}
                       size={10}
                       color={COLORS.textMuted}
                     />
@@ -356,9 +229,6 @@ export default function ScanScreen() {
 
         <View style={{ height: SPACING.xxl }} />
       </ScrollView>
-
-      {/* Signup wall modal */}
-      <SignupWall />
     </SafeAreaView>
   );
 }
@@ -384,9 +254,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
     borderRadius: BORDER_RADIUS.full,
-  },
-  premiumButton: {
-    backgroundColor: COLORS.accent,
   },
   topButtonText: {
     color: COLORS.white,
@@ -440,16 +307,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginVertical: SPACING.lg,
   },
-  actions: {
-    flexDirection: 'row',
-    gap: SPACING.lg,
-    width: '100%',
-    justifyContent: 'center',
-  },
-  actionButton: {
+  scanButton: {
     alignItems: 'center',
-    flex: 1,
-    maxWidth: 160,
   },
   iconCircle: {
     width: 80,
@@ -477,23 +336,6 @@ const styles = StyleSheet.create({
   loadingText: {
     color: COLORS.textSecondary,
     fontSize: 16,
-  },
-  guestBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-    backgroundColor: COLORS.primary + '15',
-    borderRadius: BORDER_RADIUS.md,
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.md,
-    marginTop: SPACING.xl,
-    borderWidth: 1,
-    borderColor: COLORS.primary + '30',
-  },
-  guestBannerText: {
-    color: COLORS.primary,
-    fontSize: 13,
-    fontWeight: '600',
   },
 
   // Search History

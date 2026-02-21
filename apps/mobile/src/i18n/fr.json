@@ -96,6 +96,8 @@
     "emptyDescription": "Scannez un produit et ajoutez-le au suivi pour recevoir des alertes de baisse de prix.",
     "premiumRequired": "Fonctionnalité Premium",
     "premiumDescription": "Abonnez-vous pour suivre les prix de vos produits et recevoir des alertes.",
+    "loginRequired": "Connexion requise",
+    "loginDescription": "Connectez-vous pour suivre les prix de vos produits et recevoir des alertes de baisse.",
     "subscribe": "S'abonner",
     "removeTracking": "Retirer du suivi",
     "priceHistory": "Historique des prix",

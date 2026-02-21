@@ -1,12 +1,11 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth.middleware';
-import { premiumMiddleware } from '../middleware/premium.middleware';
 import * as trackingController from '../controllers/tracking.controller';
 
 const router = Router();
 
-// All tracking routes require authentication + premium subscription
-router.use(authMiddleware, premiumMiddleware);
+// All tracking routes require authentication (free for all logged-in users)
+router.use(authMiddleware);
 
 // GET  /api/tracked           — list all tracked products
 router.get('/', trackingController.getTrackedProducts);
