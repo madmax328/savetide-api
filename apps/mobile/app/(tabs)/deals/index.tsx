@@ -22,6 +22,17 @@ import { formatPrice, formatDiscount } from '../../../src/utils/formatPrice';
 import { getStoreConfig } from '../../../src/utils/storeConfig';
 import type { Deal } from '../../../src/services/dealService';
 
+const CATEGORY_ICONS: Record<string, string> = {
+  all: 'th-large',
+  electronics: 'microchip',
+  home: 'home',
+  fashion: 'scissors',
+  sports: 'futbol-o',
+  beauty: 'diamond',
+  toys: 'gamepad',
+  general: 'tags',
+};
+
 const CATEGORIES = ['all', 'electronics', 'home', 'fashion', 'sports', 'beauty', 'toys', 'general'];
 
 export default function DealsScreen() {
@@ -73,40 +84,41 @@ export default function DealsScreen() {
         {item.imageUrl ? (
           <View style={styles.dealImageContainer}>
             <Image source={{ uri: item.imageUrl }} style={styles.dealImage} resizeMode="contain" />
-            <View style={styles.discountBadge}>
-              <Text style={styles.discountText}>{formatDiscount(item.discountPercent)}</Text>
-            </View>
           </View>
         ) : (
           <View style={styles.dealImagePlaceholder}>
             <FontAwesome name="tag" size={30} color={COLORS.textMuted} />
-            <View style={styles.discountBadge}>
-              <Text style={styles.discountText}>{formatDiscount(item.discountPercent)}</Text>
-            </View>
           </View>
         )}
+
+        {/* Discount badge — top-left overlay */}
+        <View style={styles.discountBadge}>
+          <Text style={styles.discountText}>{formatDiscount(item.discountPercent)}</Text>
+        </View>
 
         <View style={styles.dealInfo}>
           <Text style={styles.dealTitle} numberOfLines={2}>
             {item.title}
           </Text>
 
-          {/* Store chip */}
-          <View style={styles.storeChip}>
+          {/* Store chip — colored background */}
+          <View style={[styles.storeChip, { backgroundColor: storeConfig.color + '15' }]}>
             <View style={[styles.storeChipDot, { backgroundColor: storeConfig.color }]} />
-            <Text style={styles.storeChipText}>{storeConfig.displayName}</Text>
+            <Text style={[styles.storeChipText, { color: storeConfig.color }]}>
+              {storeConfig.displayName}
+            </Text>
           </View>
 
           {/* Prices */}
           <View style={styles.priceRow}>
+            <Text style={styles.dealPrice}>
+              {formatPrice(item.dealPrice, item.currency)}
+            </Text>
             {item.originalPrice > 0 && (
               <Text style={styles.originalPrice}>
                 {formatPrice(item.originalPrice, item.currency)}
               </Text>
             )}
-            <Text style={styles.dealPrice}>
-              {formatPrice(item.dealPrice, item.currency)}
-            </Text>
           </View>
 
           {/* CTA */}
@@ -147,6 +159,11 @@ export default function DealsScreen() {
               style={[styles.categoryChip, selectedCategory === cat && styles.categoryChipActive]}
               onPress={() => handleCategoryPress(cat)}
             >
+              <FontAwesome
+                name={CATEGORY_ICONS[cat] as any}
+                size={13}
+                color={selectedCategory === cat ? COLORS.white : COLORS.textSecondary}
+              />
               <Text
                 style={[
                   styles.categoryText,
@@ -218,6 +235,9 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   categoryChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
     borderRadius: BORDER_RADIUS.full,
@@ -246,8 +266,11 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.md,
     marginBottom: SPACING.md,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
   dealImageContainer: {
     height: 160,
@@ -268,16 +291,18 @@ const styles = StyleSheet.create({
   discountBadge: {
     position: 'absolute',
     top: SPACING.sm,
-    right: SPACING.sm,
+    left: SPACING.sm,
     backgroundColor: COLORS.danger,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 4,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 6,
     borderRadius: BORDER_RADIUS.sm,
+    zIndex: 1,
   },
   discountText: {
     color: COLORS.white,
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '800',
+    letterSpacing: 0.3,
   },
   dealInfo: {
     padding: SPACING.md,
@@ -291,7 +316,11 @@ const styles = StyleSheet.create({
   storeChip: {
     flexDirection: 'row',
     alignItems: 'center',
+    alignSelf: 'flex-start',
     gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: BORDER_RADIUS.full,
     marginBottom: SPACING.sm,
   },
   storeChipDot: {
@@ -301,8 +330,7 @@ const styles = StyleSheet.create({
   },
   storeChipText: {
     fontSize: 13,
-    color: COLORS.textSecondary,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   priceRow: {
     flexDirection: 'row',
@@ -316,7 +344,7 @@ const styles = StyleSheet.create({
     textDecorationLine: 'line-through',
   },
   dealPrice: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '800',
     color: COLORS.success,
   },

@@ -43,6 +43,23 @@
     "tracked": "Tracked",
     "profile": "Profile"
   },
+  "home": {
+    "recentlyViewed": "Recently viewed",
+    "topCategories": "Categories",
+    "popularProducts": "Popular products",
+    "topDeals": "Today's deals",
+    "comingSoon": "Coming soon"
+  },
+  "categories": {
+    "smartphones": "Smartphones",
+    "laptops": "Laptops",
+    "tv": "Television",
+    "headphones": "Headphones",
+    "sneakers": "Sneakers",
+    "gaming": "Gaming",
+    "beauty": "Beauty",
+    "home": "Home"
+  },
   "scan": {
     "title": "Scan a product",
     "searchPlaceholder": "Search for a product...",
@@ -68,6 +85,18 @@
     "trackProduct": "Track this product",
     "noResults": "No prices found for this product",
     "noUrl": "No link available for this deal",
+    "fromPrice": "from {{price}}",
+    "tabs": {
+      "offers": "Offers",
+      "chart": "Price history",
+      "details": "Product info"
+    },
+    "noHistory": "No price history available yet",
+    "productInfo": "Product information",
+    "limitedInfo": "Limited information for this product",
+    "brand": "Brand",
+    "category": "Category",
+    "barcode": "Barcode",
     "searching": "Finding the best prices...",
     "newSearch": "New search",
     "inStock": "In stock",

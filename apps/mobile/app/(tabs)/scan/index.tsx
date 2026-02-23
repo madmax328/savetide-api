@@ -10,6 +10,9 @@ import {
   Alert,
   ScrollView,
   Image,
+  FlatList,
+  Linking,
+  Dimensions,
 } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useRouter } from 'expo-router';
@@ -17,28 +20,73 @@ import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../../src/store/authStore';
 import { useScanStore } from '../../../src/store/scanStore';
 import { useSearchHistoryStore } from '../../../src/store/searchHistoryStore';
+import { useHomeStore } from '../../../src/store/homeStore';
 import type { SearchHistoryItem } from '../../../src/store/searchHistoryStore';
+import type { Product, CategoryDef } from '../../../src/services/productService';
+import type { Deal } from '../../../src/services/dealService';
 import BarcodeScanner from '../../../src/components/scan/BarcodeScanner';
 import { COLORS, SPACING, BORDER_RADIUS } from '../../../src/utils/constants';
-import { formatPrice } from '../../../src/utils/formatPrice';
+import { formatPrice, formatDiscount } from '../../../src/utils/formatPrice';
+import { getStoreConfig } from '../../../src/utils/storeConfig';
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+// ---------------------------------------------------------------------------
+// Section Header component
+// ---------------------------------------------------------------------------
+function SectionHeader({
+  title,
+  onSeeAll,
+  seeAllLabel,
+}: {
+  title: string;
+  onSeeAll?: () => void;
+  seeAllLabel?: string;
+}) {
+  return (
+    <View style={styles.sectionHeader}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      {onSeeAll && (
+        <TouchableOpacity onPress={onSeeAll}>
+          <Text style={styles.seeAllText}>{seeAllLabel || 'Voir tout'}</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main Screen
+// ---------------------------------------------------------------------------
 export default function ScanScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
   const { searchByText, searchByBarcode, isSearching } = useScanStore();
   const { history, loadHistory, clearHistory } = useSearchHistoryStore();
+  const {
+    popularProducts,
+    categories,
+    topDeals,
+    isLoadingPopular,
+    loadAll,
+  } = useHomeStore();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [showScanner, setShowScanner] = useState(false);
   const isNavigatingRef = useRef(false);
 
   const country = user?.country || 'FR';
 
-  // Load search history on mount
+  // Load all home data on mount
   useEffect(() => {
     loadHistory();
-  }, []);
+    loadAll(country);
+  }, [country]);
 
+  // ---------------------------------------------------------------------------
+  // Handlers
+  // ---------------------------------------------------------------------------
   const handleSearch = useCallback(async () => {
     if (!searchQuery.trim() || isNavigatingRef.current) return;
     isNavigatingRef.current = true;
@@ -53,17 +101,14 @@ export default function ScanScreen() {
     }
   }, [searchQuery, country]);
 
-  const handleBarcodeScanned = useCallback(async (barcode: string, barcodeType: string) => {
+  const handleBarcodeScanned = useCallback(async (barcode: string, _barcodeType: string) => {
     if (isNavigatingRef.current) return;
     setShowScanner(false);
-
-    // Clean barcode — strip any non-alphanumeric chars
     const cleanBarcode = barcode.replace(/[^a-zA-Z0-9]/g, '').trim();
     if (!cleanBarcode) {
       Alert.alert(t('common.error'), t('results.noResults'));
       return;
     }
-
     isNavigatingRef.current = true;
     try {
       await searchByBarcode(cleanBarcode, country);
@@ -78,7 +123,6 @@ export default function ScanScreen() {
 
   const handleHistoryTap = useCallback(async (item: SearchHistoryItem) => {
     if (isNavigatingRef.current) return;
-
     isNavigatingRef.current = true;
     try {
       if (item.type === 'barcode') {
@@ -100,6 +144,43 @@ export default function ScanScreen() {
     }
   }, [country]);
 
+  const handleCategoryTap = useCallback(async (cat: CategoryDef) => {
+    if (isNavigatingRef.current) return;
+    isNavigatingRef.current = true;
+    try {
+      await searchByText(cat.searchQuery, country);
+      router.push({
+        pathname: '/(tabs)/scan/results',
+        params: { query: cat.searchQuery, type: 'text' },
+      });
+    } finally {
+      setTimeout(() => { isNavigatingRef.current = false; }, 1000);
+    }
+  }, [country]);
+
+  const handlePopularTap = useCallback(async (product: Product) => {
+    if (isNavigatingRef.current) return;
+    isNavigatingRef.current = true;
+    try {
+      await searchByText(product.name, country);
+      router.push({
+        pathname: '/(tabs)/scan/results',
+        params: { query: product.name, type: 'text' },
+      });
+    } finally {
+      setTimeout(() => { isNavigatingRef.current = false; }, 1000);
+    }
+  }, [country]);
+
+  const handleDealTap = useCallback((deal: Deal) => {
+    if (deal.productUrl) {
+      Linking.openURL(deal.productUrl);
+    }
+  }, []);
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
   if (showScanner) {
     return (
       <BarcodeScanner
@@ -114,7 +195,7 @@ export default function ScanScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingText}>{t('common.loading')}</Text>
+          <Text style={styles.loadingText}>{t('results.searching')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -122,32 +203,15 @@ export default function ScanScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Top bar with sign-in button for guests */}
-      <View style={styles.topBar}>
-        <View style={{ flex: 1 }} />
-        {!isAuthenticated && (
-          <TouchableOpacity
-            style={styles.topButton}
-            onPress={() => router.push('/(auth)/login')}
-          >
-            <FontAwesome name="sign-in" size={14} color={COLORS.white} />
-            <Text style={styles.topButtonText}>{t('auth.signIn')}</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
       <ScrollView
-        style={styles.scrollContent}
-        contentContainerStyle={styles.scrollContentContainer}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.scrollContainer}
       >
-        <View style={styles.content}>
-          <Text style={styles.logo}>SaveTide</Text>
-          <Text style={styles.subtitle}>{t('app.tagline')}</Text>
-
+        {/* ─── Search Bar ─────────────────────────────── */}
+        <View style={styles.searchBarRow}>
           <View style={styles.searchContainer}>
-            <FontAwesome name="search" size={18} color={COLORS.textMuted} style={styles.searchIcon} />
+            <FontAwesome name="search" size={16} color={COLORS.textMuted} />
             <TextInput
               style={styles.searchInput}
               value={searchQuery}
@@ -159,72 +223,184 @@ export default function ScanScreen() {
             />
             {searchQuery.length > 0 && (
               <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <FontAwesome name="times-circle" size={18} color={COLORS.textMuted} />
+                <FontAwesome name="times-circle" size={16} color={COLORS.textMuted} />
               </TouchableOpacity>
             )}
           </View>
-
-          <Text style={styles.orText}>{t('scan.orSearch')}</Text>
-
-          <TouchableOpacity style={styles.scanButton} onPress={() => setShowScanner(true)}>
-            <View style={styles.iconCircle}>
-              <FontAwesome name="barcode" size={32} color={COLORS.primary} />
-            </View>
-            <Text style={styles.actionText}>{t('scan.scanBarcode')}</Text>
+          <TouchableOpacity style={styles.barcodeButton} onPress={() => setShowScanner(true)}>
+            <FontAwesome name="barcode" size={20} color={COLORS.white} />
           </TouchableOpacity>
         </View>
 
-        {/* Search History */}
+        {/* ─── Recently Viewed ────────────────────────── */}
         {history.length > 0 && (
-          <View style={styles.historySection}>
-            <View style={styles.historyHeader}>
-              <Text style={styles.historySectionTitle}>{t('scan.recentSearches')}</Text>
-              <TouchableOpacity onPress={clearHistory}>
-                <Text style={styles.historyClearText}>{t('common.delete')}</Text>
-              </TouchableOpacity>
-            </View>
-
-            {history.slice(0, 8).map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                style={styles.historyItem}
-                onPress={() => handleHistoryTap(item)}
-              >
-                {item.imageUrl ? (
-                  <Image source={{ uri: item.imageUrl }} style={styles.historyImage} />
-                ) : (
-                  <View style={styles.historyImagePlaceholder}>
-                    <FontAwesome
-                      name={item.type === 'barcode' ? 'barcode' : 'search'}
-                      size={16}
-                      color={COLORS.textMuted}
-                    />
-                  </View>
-                )}
-                <View style={styles.historyInfo}>
-                  <Text style={styles.historyName} numberOfLines={1}>
+          <View style={styles.section}>
+            <SectionHeader
+              title={t('home.recentlyViewed')}
+              onSeeAll={clearHistory}
+              seeAllLabel={t('common.delete')}
+            />
+            <FlatList
+              horizontal
+              data={history.slice(0, 10)}
+              keyExtractor={(item) => item.id}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalList}
+              renderItem={({ item }) => (
+                <TouchableOpacity style={styles.recentCard} onPress={() => handleHistoryTap(item)}>
+                  {item.imageUrl ? (
+                    <Image source={{ uri: item.imageUrl }} style={styles.recentImage} />
+                  ) : (
+                    <View style={[styles.recentImage, styles.recentImagePlaceholder]}>
+                      <FontAwesome
+                        name={item.type === 'barcode' ? 'barcode' : 'search'}
+                        size={18}
+                        color={COLORS.textMuted}
+                      />
+                    </View>
+                  )}
+                  <Text style={styles.recentName} numberOfLines={2}>
                     {item.productName || item.query}
                   </Text>
-                  <View style={styles.historyMeta}>
-                    <FontAwesome
-                      name={item.type === 'barcode' ? 'barcode' : 'search'}
-                      size={10}
-                      color={COLORS.textMuted}
-                    />
-                    <Text style={styles.historyQuery} numberOfLines={1}>
-                      {item.query.length > 30 ? item.query.substring(0, 30) + '...' : item.query}
+                  {item.lowestPrice ? (
+                    <Text style={styles.recentPrice}>
+                      {formatPrice(item.lowestPrice, item.currency || 'EUR')}
                     </Text>
-                  </View>
-                </View>
-                {item.lowestPrice ? (
-                  <Text style={styles.historyPrice}>
-                    {formatPrice(item.lowestPrice, item.currency || 'EUR')}
-                  </Text>
-                ) : null}
-                <FontAwesome name="chevron-right" size={12} color={COLORS.textMuted} />
-              </TouchableOpacity>
-            ))}
+                  ) : null}
+                </TouchableOpacity>
+              )}
+            />
           </View>
+        )}
+
+        {/* ─── Categories ─────────────────────────────── */}
+        {categories.length > 0 && (
+          <View style={styles.section}>
+            <SectionHeader title={t('home.topCategories')} />
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalList}
+            >
+              {categories.map((cat) => (
+                <TouchableOpacity
+                  key={cat.key}
+                  style={styles.categoryItem}
+                  onPress={() => handleCategoryTap(cat)}
+                >
+                  <View style={styles.categoryCircle}>
+                    <FontAwesome name={cat.icon as any} size={22} color={COLORS.primary} />
+                  </View>
+                  <Text style={styles.categoryLabel} numberOfLines={1}>
+                    {t(cat.labelKey)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* ─── Popular Products ────────────────────────── */}
+        {popularProducts.length > 0 && (
+          <View style={styles.section}>
+            <SectionHeader title={t('home.popularProducts')} />
+            <FlatList
+              horizontal
+              data={popularProducts}
+              keyExtractor={(item) => item._id}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalList}
+              renderItem={({ item }) => (
+                <TouchableOpacity style={styles.popularCard} onPress={() => handlePopularTap(item)}>
+                  {item.imageUrl ? (
+                    <Image source={{ uri: item.imageUrl }} style={styles.popularImage} />
+                  ) : (
+                    <View style={[styles.popularImage, styles.popularImagePlaceholder]}>
+                      <FontAwesome name="cube" size={28} color={COLORS.textMuted} />
+                    </View>
+                  )}
+                  <Text style={styles.popularName} numberOfLines={2}>
+                    {item.name}
+                  </Text>
+                  {item.lowestPrice > 0 && (
+                    <Text style={styles.popularPrice}>
+                      {t('results.fromPrice', { price: formatPrice(item.lowestPrice, item.prices?.[0]?.currency || 'EUR') })}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        )}
+
+        {/* ─── Top Deals ──────────────────────────────── */}
+        {topDeals.length > 0 && (
+          <View style={styles.section}>
+            <SectionHeader
+              title={t('home.topDeals')}
+              onSeeAll={() => router.push('/(tabs)/deals')}
+              seeAllLabel={t('common.seeAll')}
+            />
+            {topDeals.slice(0, 4).map((deal) => {
+              const storeConfig = getStoreConfig(deal.marketplace);
+              return (
+                <TouchableOpacity
+                  key={deal._id}
+                  style={styles.dealCard}
+                  onPress={() => handleDealTap(deal)}
+                >
+                  {deal.imageUrl ? (
+                    <Image source={{ uri: deal.imageUrl }} style={styles.dealImage} />
+                  ) : (
+                    <View style={[styles.dealImage, styles.dealImagePlaceholder]}>
+                      <FontAwesome name="tag" size={20} color={COLORS.textMuted} />
+                    </View>
+                  )}
+                  <View style={styles.dealInfo}>
+                    <Text style={styles.dealTitle} numberOfLines={2}>{deal.title}</Text>
+                    <View style={styles.dealStoreRow}>
+                      <View style={[styles.dealStoreDot, { backgroundColor: storeConfig.color }]} />
+                      <Text style={styles.dealStoreName}>{storeConfig.displayName}</Text>
+                    </View>
+                    <View style={styles.dealPriceRow}>
+                      <Text style={styles.dealPrice}>
+                        {formatPrice(deal.dealPrice, deal.currency)}
+                      </Text>
+                      {deal.originalPrice > deal.dealPrice && (
+                        <Text style={styles.dealOriginalPrice}>
+                          {formatPrice(deal.originalPrice, deal.currency)}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                  {deal.discountPercent > 0 && (
+                    <View style={styles.dealBadge}>
+                      <Text style={styles.dealBadgeText}>{formatDiscount(deal.discountPercent)}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+
+        {/* ─── Loading indicator for home data ────────── */}
+        {isLoadingPopular && popularProducts.length === 0 && categories.length === 0 && (
+          <View style={styles.homeLoading}>
+            <ActivityIndicator size="small" color={COLORS.primary} />
+          </View>
+        )}
+
+        {/* ─── Sign-in prompt for guests ──────────────── */}
+        {!isAuthenticated && (
+          <TouchableOpacity
+            style={styles.signInBanner}
+            onPress={() => router.push('/(auth)/login')}
+          >
+            <FontAwesome name="user-circle" size={18} color={COLORS.primary} />
+            <Text style={styles.signInBannerText}>{t('auth.signIn')}</Text>
+            <FontAwesome name="chevron-right" size={12} color={COLORS.primary} />
+          </TouchableOpacity>
         )}
 
         <View style={{ height: SPACING.xxl }} />
@@ -233,99 +409,18 @@ export default function ScanScreen() {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Styles
+// ---------------------------------------------------------------------------
+const CARD_WIDTH = (SCREEN_WIDTH - SPACING.lg * 2 - SPACING.sm) / 2.5;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  topBar: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.sm,
-    paddingBottom: SPACING.xs,
-  },
-  topButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.full,
-  },
-  topButtonText: {
-    color: COLORS.white,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  scrollContent: {
-    flex: 1,
-  },
-  scrollContentContainer: {
-    flexGrow: 1,
-  },
-  content: {
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.lg,
-    alignItems: 'center',
-  },
-  logo: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: COLORS.primary,
-    letterSpacing: -1,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: COLORS.textSecondary,
-    marginTop: SPACING.xs,
-    marginBottom: SPACING.xl,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.md,
-    paddingHorizontal: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    width: '100%',
-  },
-  searchIcon: {
-    marginRight: SPACING.sm,
-  },
-  searchInput: {
-    flex: 1,
-    paddingVertical: SPACING.md,
-    fontSize: 16,
-    color: COLORS.text,
-  },
-  orText: {
-    color: COLORS.textMuted,
-    fontSize: 14,
-    marginVertical: SPACING.lg,
-  },
-  scanButton: {
-    alignItems: 'center',
-  },
-  iconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: COLORS.surface,
-    borderWidth: 2,
-    borderColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: SPACING.sm,
-  },
-  actionText: {
-    color: COLORS.text,
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
+  scrollContainer: {
+    paddingBottom: SPACING.xl,
   },
   loadingContainer: {
     flex: 1,
@@ -338,74 +433,256 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 
-  // Search History
-  historySection: {
+  // ─── Search Bar ──────────────────────────────────
+  searchBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: SPACING.lg,
-    marginTop: SPACING.xl,
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.sm,
+    gap: SPACING.sm,
   },
-  historyHeader: {
+  searchContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.md,
+    paddingHorizontal: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    gap: SPACING.sm,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: COLORS.text,
+  },
+  barcodeButton: {
+    width: 48,
+    height: 48,
+    borderRadius: BORDER_RADIUS.md,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // ─── Sections ────────────────────────────────────
+  section: {
+    marginTop: SPACING.lg,
+  },
+  sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: SPACING.lg,
     marginBottom: SPACING.md,
   },
-  historySectionTitle: {
-    fontSize: 17,
-    fontWeight: '700',
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '800',
     color: COLORS.text,
   },
-  historyClearText: {
-    fontSize: 13,
-    color: COLORS.textMuted,
-    fontWeight: '500',
+  seeAllText: {
+    fontSize: 14,
+    color: COLORS.primary,
+    fontWeight: '600',
   },
-  historyItem: {
+  horizontalList: {
+    paddingHorizontal: SPACING.lg,
+    gap: SPACING.sm,
+  },
+
+  // ─── Recently Viewed ─────────────────────────────
+  recentCard: {
+    width: 110,
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  recentImage: {
+    width: '100%',
+    height: 70,
+    borderRadius: BORDER_RADIUS.sm,
+    backgroundColor: COLORS.surfaceLight,
+  },
+  recentImagePlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  recentName: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginTop: SPACING.xs,
+    lineHeight: 16,
+  },
+  recentPrice: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.success,
+    marginTop: 2,
+  },
+
+  // ─── Categories ──────────────────────────────────
+  categoryItem: {
+    alignItems: 'center',
+    width: 72,
+  },
+  categoryCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: COLORS.primary + '12',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: SPACING.xs,
+  },
+  categoryLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+  },
+
+  // ─── Popular Products ────────────────────────────
+  popularCard: {
+    width: CARD_WIDTH,
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.md,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  popularImage: {
+    width: '100%',
+    height: 120,
+    backgroundColor: COLORS.surfaceLight,
+  },
+  popularImagePlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  popularName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.text,
+    paddingHorizontal: SPACING.sm,
+    paddingTop: SPACING.sm,
+    lineHeight: 17,
+  },
+  popularPrice: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.success,
+    paddingHorizontal: SPACING.sm,
+    paddingTop: 2,
+    paddingBottom: SPACING.sm,
+  },
+
+  // ─── Top Deals ───────────────────────────────────
+  dealCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.surface,
     borderRadius: BORDER_RADIUS.md,
     padding: SPACING.sm,
-    marginBottom: SPACING.xs,
-    gap: SPACING.sm,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    marginHorizontal: SPACING.lg,
+    marginBottom: SPACING.sm,
+    gap: SPACING.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  historyImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
+  dealImage: {
+    width: 64,
+    height: 64,
+    borderRadius: BORDER_RADIUS.sm,
     backgroundColor: COLORS.surfaceLight,
   },
-  historyImagePlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: COLORS.surfaceLight,
+  dealImagePlaceholder: {
     justifyContent: 'center',
     alignItems: 'center',
   },
-  historyInfo: {
+  dealInfo: {
     flex: 1,
-    gap: 2,
+    gap: 3,
   },
-  historyName: {
+  dealTitle: {
     fontSize: 14,
     fontWeight: '600',
     color: COLORS.text,
+    lineHeight: 18,
   },
-  historyMeta: {
+  dealStoreRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
   },
-  historyQuery: {
-    fontSize: 11,
-    color: COLORS.textMuted,
+  dealStoreDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
-  historyPrice: {
-    fontSize: 14,
-    fontWeight: '700',
+  dealStoreName: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    fontWeight: '500',
+  },
+  dealPriceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  dealPrice: {
+    fontSize: 16,
+    fontWeight: '800',
     color: COLORS.success,
-    marginRight: SPACING.xs,
+  },
+  dealOriginalPrice: {
+    fontSize: 13,
+    color: COLORS.textMuted,
+    textDecorationLine: 'line-through',
+  },
+  dealBadge: {
+    backgroundColor: COLORS.danger,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 4,
+    borderRadius: BORDER_RADIUS.sm,
+  },
+  dealBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.white,
+  },
+
+  // ─── Home Loading ────────────────────────────────
+  homeLoading: {
+    paddingVertical: SPACING.xl,
+    alignItems: 'center',
+  },
+
+  // ─── Sign-in Banner ──────────────────────────────
+  signInBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    backgroundColor: COLORS.primary + '10',
+    borderRadius: BORDER_RADIUS.md,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    marginHorizontal: SPACING.lg,
+    marginTop: SPACING.lg,
+  },
+  signInBannerText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.primary,
   },
 });

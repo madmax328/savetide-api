@@ -310,7 +310,61 @@ export async function getProductHistory(
   return history;
 }
 
-// Image search removed — feature deprecated to reduce SerpApi costs.
+// ---------------------------------------------------------------------------
+// Discovery endpoints (no SerpApi calls — reads from MongoDB cache only)
+// ---------------------------------------------------------------------------
+
+/**
+ * Category definition used by the home page category carousel.
+ */
+export interface CategoryDef {
+  key: string;
+  icon: string;        // FontAwesome icon name
+  labelKey: string;    // i18n translation key
+  searchQuery: string; // text query triggered when the user taps this category
+}
+
+/**
+ * Return a static list of product categories for the home page.
+ * No database call — instant, zero cost.
+ */
+export function getCategories(): CategoryDef[] {
+  return [
+    { key: 'smartphones', icon: 'mobile', labelKey: 'categories.smartphones', searchQuery: 'smartphone' },
+    { key: 'laptops', icon: 'laptop', labelKey: 'categories.laptops', searchQuery: 'laptop' },
+    { key: 'tv', icon: 'tv', labelKey: 'categories.tv', searchQuery: 'tv 4k' },
+    { key: 'headphones', icon: 'headphones', labelKey: 'categories.headphones', searchQuery: 'headphones' },
+    { key: 'sneakers', icon: 'futbol-o', labelKey: 'categories.sneakers', searchQuery: 'sneakers' },
+    { key: 'gaming', icon: 'gamepad', labelKey: 'categories.gaming', searchQuery: 'gaming console' },
+    { key: 'beauty', icon: 'paint-brush', labelKey: 'categories.beauty', searchQuery: 'beauty' },
+    { key: 'home', icon: 'home', labelKey: 'categories.home', searchQuery: 'home appliance' },
+  ];
+}
+
+/**
+ * Return the most recently searched/updated products from the MongoDB cache.
+ * Uses `updatedAt` as a proxy for popularity (frequently searched products
+ * get updated more often). Zero SerpApi calls — reads cached data only.
+ */
+export async function getPopularProducts(
+  country: string = 'FR',
+  limit: number = 10,
+): Promise<Record<string, unknown>[]> {
+  const products = await Product.find({
+    country,
+    'prices.0': { $exists: true },
+    lowestPrice: { $gt: 0 },
+  })
+    .sort({ updatedAt: -1 })
+    .limit(limit)
+    .select('name brand imageUrl lowestPrice lowestPriceStore country prices')
+    .lean();
+
+  return products.map((p) => ({
+    ...p,
+    prices: applyAffiliateUrls(p.prices as unknown as IStorePrice[]),
+  }));
+}
 
 // ---------------------------------------------------------------------------
 // Utilities

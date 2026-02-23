@@ -1,14 +1,14 @@
 import { Router } from 'express';
 import * as dealController from '../controllers/deal.controller';
-import { authMiddleware } from '../middleware/auth.middleware';
+import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.middleware';
 
 const router = Router();
 
-// Get deals — paginated, filtered by country and category
-router.get('/', authMiddleware, dealController.getDeals);
+// Get deals — guest-accessible (for home page top deals section)
+router.get('/', optionalAuthMiddleware, dealController.getDeals);
 
-// Get a single deal by ID
-router.get('/:id', authMiddleware, dealController.getDealById);
+// Get a single deal by ID — guest-accessible
+router.get('/:id', optionalAuthMiddleware, dealController.getDealById);
 
 // Manually trigger deal detection (admin / cron endpoint)
 router.post('/detect', authMiddleware, dealController.triggerDetection);

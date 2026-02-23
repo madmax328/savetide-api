@@ -155,8 +155,52 @@ export async function getProductPrices(req: Request, res: Response): Promise<voi
 }
 
 /**
+ * GET /products/popular?country=FR&limit=10
+ * Returns recently searched products from MongoDB cache (zero SerpApi calls).
+ */
+export async function getPopularProducts(req: Request, res: Response): Promise<void> {
+  try {
+    const popularQuerySchema = z.object({
+      country: z.enum(['FR', 'US']).optional().default('FR'),
+      limit: z
+        .string()
+        .optional()
+        .default('10')
+        .transform((val) => parseInt(val, 10))
+        .pipe(z.number().int().min(1).max(20)),
+    });
+
+    const { country, limit } = popularQuerySchema.parse(req.query);
+    const products = await productService.getPopularProducts(country, limit);
+
+    res.json({ products });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: 'Validation error', details: error.errors });
+      return;
+    }
+
+    logger.error({ error }, 'Get popular products failed');
+    res.status(500).json({ error: 'Failed to get popular products' });
+  }
+}
+
+/**
+ * GET /products/categories
+ * Returns a static list of product categories.
+ */
+export async function getCategories(_req: Request, res: Response): Promise<void> {
+  try {
+    const categories = productService.getCategories();
+    res.json({ categories });
+  } catch (error) {
+    logger.error({ error }, 'Get categories failed');
+    res.status(500).json({ error: 'Failed to get categories' });
+  }
+}
+
+/**
  * GET /products/:id/history?marketplace=amazon_fr&days=30
- * Requires premium subscription (enforced at route level).
  */
 export async function getProductHistory(req: Request, res: Response): Promise<void> {
   try {

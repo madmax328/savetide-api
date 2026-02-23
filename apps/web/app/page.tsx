@@ -273,7 +273,7 @@ export default function Home() {
         </p>
         <div className="cta-buttons">
           <a
-            href="https://testflight.apple.com/join/PLACEHOLDER"
+            href="https://testflight.apple.com/join/KAJTdfCK"
             target="_blank"
             rel="noopener noreferrer"
             className="store-button"
