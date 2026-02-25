@@ -3,6 +3,10 @@ import './globals.css';
 import { LocaleProvider } from './lib/LocaleProvider';
 
 export const metadata: Metadata = {
+  icons: {
+    icon: '/favicon.svg',
+    apple: '/favicon.svg',
+  },
   title: 'SaveTide - Smart Price Comparison | Comparateur de Prix',
   description:
     'Compare prices on millions of products instantly. Scan a barcode or search for a product to find the best price across Amazon, Walmart, Fnac, Cdiscount, and hundreds of retailers.',

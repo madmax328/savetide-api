@@ -3,17 +3,30 @@
 import { useLocale } from './lib/LocaleProvider';
 import { LangSwitcher } from './lib/LangSwitcher';
 
+const MERCHANTS_FR = [
+  'Amazon', 'Fnac', 'Cdiscount', 'Darty', 'Boulanger',
+  'Rakuten', 'E.Leclerc', 'Carrefour', 'eBay', 'Back Market',
+];
+const MERCHANTS_EN = [
+  'Amazon', 'Walmart', 'Best Buy', 'Target', 'Newegg',
+  'Costco', 'Home Depot', 'eBay', 'Back Market', 'B&H Photo',
+];
+const HERO_STORES_FR = ['Amazon', 'Fnac', 'Cdiscount', 'Darty', 'Boulanger', 'Rakuten', 'eBay'];
+const HERO_STORES_EN = ['Amazon', 'Walmart', 'Best Buy', 'Target', 'eBay', 'Newegg', 'Costco'];
+
 export default function Home() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const merchants = locale === 'fr' ? MERCHANTS_FR : MERCHANTS_EN;
+  const heroStores = locale === 'fr' ? HERO_STORES_FR : HERO_STORES_EN;
 
   return (
     <>
       {/* Navbar */}
       <nav className="navbar">
         <div className="navbar-inner">
-          <div className="nav-logo">
+          <a href="/" className="nav-logo">
             Save<span>Tide</span>
-          </div>
+          </a>
 
           <div className="nav-links">
             <a href="#features">{t('nav.features')}</a>
@@ -62,13 +75,9 @@ export default function Home() {
           <div className="hero-stores">
             <p>{t('hero.compareOn')}</p>
             <div className="store-logos">
-              <span>Amazon</span>
-              <span>Fnac</span>
-              <span>Cdiscount</span>
-              <span>Darty</span>
-              <span>Boulanger</span>
-              <span>Walmart</span>
-              <span>eBay</span>
+              {heroStores.map((name) => (
+                <span key={name}>{name}</span>
+              ))}
             </div>
           </div>
         </div>
@@ -188,24 +197,7 @@ export default function Home() {
           </div>
 
           <div className="merchants-grid">
-            {[
-              'Amazon',
-              'Fnac',
-              'Cdiscount',
-              'Darty',
-              'Boulanger',
-              'Rakuten',
-              'E.Leclerc',
-              'Carrefour',
-              'eBay',
-              'Back Market',
-              'Walmart',
-              'Best Buy',
-              'Target',
-              'Newegg',
-              'Costco',
-              'Home Depot',
-            ].map((name) => (
+            {merchants.map((name) => (
               <div key={name} className="merchant-card">
                 {name}
               </div>
@@ -246,9 +238,9 @@ export default function Home() {
       <footer className="footer">
         <div className="footer-inner">
           <div className="footer-brand">
-            <div className="footer-logo">
+            <a href="/" className="footer-logo">
               Save<span>Tide</span>
-            </div>
+            </a>
             <p>{t('footer.desc')}</p>
           </div>
 
