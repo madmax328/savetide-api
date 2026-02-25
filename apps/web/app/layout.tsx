@@ -41,6 +41,11 @@ export const metadata: Metadata = {
       'Find the best price instantly. Scan, compare, save.',
   },
   robots: { index: true, follow: true },
+  verification: {
+    other: {
+      verification: 'ad8cc392d8475079eb59a179c6d0f11e',
+    },
+  },
 };
 
 export default function RootLayout({

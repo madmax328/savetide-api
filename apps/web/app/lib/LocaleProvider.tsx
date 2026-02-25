@@ -16,8 +16,8 @@ const LocaleContext = createContext<LocaleContextType>({
 });
 
 export function LocaleProvider({ children }: { children: React.ReactNode }) {
+  // Default to 'fr' so bots/crawlers always see content (no hidden state)
   const [locale, setLocaleState] = useState<Locale>('fr');
-  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem('savetide-locale') as Locale | null;
@@ -26,7 +26,6 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
     } else {
       setLocaleState(detectLocale());
     }
-    setMounted(true);
   }, []);
 
   const setLocale = useCallback((l: Locale) => {
@@ -43,11 +42,6 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
     },
     [locale],
   );
-
-  // Avoid flash of wrong locale
-  if (!mounted) {
-    return <div style={{ visibility: 'hidden' }}>{children}</div>;
-  }
 
   return (
     <LocaleContext.Provider value={{ locale, setLocale, t: tFn }}>
