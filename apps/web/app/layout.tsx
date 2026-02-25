@@ -1,35 +1,40 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { LocaleProvider } from './lib/LocaleProvider';
 
 export const metadata: Metadata = {
-  title: 'SaveTide - Comparateur de Prix Intelligent',
+  title: 'SaveTide - Smart Price Comparison | Comparateur de Prix',
   description:
-    'Comparez les prix de millions de produits en un instant. Scannez un code-barre ou recherchez un produit pour trouver le meilleur prix parmi Amazon, Fnac, Cdiscount, Darty et des centaines de marchands.',
+    'Compare prices on millions of products instantly. Scan a barcode or search for a product to find the best price across Amazon, Walmart, Fnac, Cdiscount, and hundreds of retailers.',
   keywords: [
     'comparateur de prix',
-    'meilleur prix',
-    'scan code-barre',
     'price comparison',
+    'meilleur prix',
+    'best price',
+    'scan code-barre',
+    'barcode scan',
     'amazon',
     'fnac',
     'cdiscount',
+    'walmart',
     'bon plan',
+    'deals',
     'alerte prix',
+    'price alert',
   ],
   openGraph: {
-    title: 'SaveTide - Comparateur de Prix Intelligent',
+    title: 'SaveTide - Smart Price Comparison',
     description:
-      'Trouvez le meilleur prix en un instant. Scannez, comparez, economisez.',
-    url: 'https://savetide.com',
+      'Find the best price instantly. Scan, compare, save.',
+    url: 'https://www.savetide.com',
     siteName: 'SaveTide',
-    locale: 'fr_FR',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'SaveTide - Comparateur de Prix Intelligent',
+    title: 'SaveTide - Smart Price Comparison',
     description:
-      'Trouvez le meilleur prix en un instant. Scannez, comparez, economisez.',
+      'Find the best price instantly. Scan, compare, save.',
   },
   robots: { index: true, follow: true },
 };
@@ -40,7 +45,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fr">
+    <html lang="fr" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
@@ -53,7 +58,9 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <LocaleProvider>{children}</LocaleProvider>
+      </body>
     </html>
   );
 }

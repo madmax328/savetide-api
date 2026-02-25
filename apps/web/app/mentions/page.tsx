@@ -1,4 +1,13 @@
+'use client';
+
+import { useLocale } from '../lib/LocaleProvider';
+import { LangSwitcher } from '../lib/LangSwitcher';
+
+const h2Style = { fontSize: 20, fontWeight: 700 as const, margin: '32px 0 12px', color: '#0f172a' };
+
 export default function MentionsLegales() {
+  const { t } = useLocale();
+
   return (
     <>
       <nav className="navbar">
@@ -7,9 +16,10 @@ export default function MentionsLegales() {
             Save<span>Tide</span>
           </a>
           <div className="nav-links">
-            <a href="/#features">Fonctionnalites</a>
+            <a href="/#features">{t('nav.features')}</a>
+            <LangSwitcher />
             <a href="/#download" className="nav-cta">
-              Telecharger
+              {t('nav.download')}
             </a>
           </div>
         </div>
@@ -25,16 +35,17 @@ export default function MentionsLegales() {
         }}
       >
         <h1 style={{ fontSize: 32, fontWeight: 800, marginBottom: 32, color: '#0f172a' }}>
-          Mentions Legales
+          {t('mentions.title')}
         </h1>
 
-        <h2 style={{ fontSize: 20, fontWeight: 700, margin: '32px 0 12px', color: '#0f172a' }}>
-          Editeur du site
-        </h2>
+        <h2 style={h2Style}>{t('mentions.s1.title')}</h2>
         <p>
           SaveTide
           <br />
-          Site web : <a href="https://savetide.com" style={{ color: '#0ea5e9' }}>savetide.com</a>
+          {t('mentions.s1.website')}{' '}
+          <a href="https://savetide.com" style={{ color: '#0ea5e9' }}>
+            savetide.com
+          </a>
           <br />
           Email :{' '}
           <a href="mailto:contact@savetide.com" style={{ color: '#0ea5e9' }}>
@@ -42,11 +53,9 @@ export default function MentionsLegales() {
           </a>
         </p>
 
-        <h2 style={{ fontSize: 20, fontWeight: 700, margin: '32px 0 12px', color: '#0f172a' }}>
-          Hebergement
-        </h2>
+        <h2 style={h2Style}>{t('mentions.s2.title')}</h2>
         <p>
-          Le site est heberge par :
+          {t('mentions.s2.desc')}
           <br />
           Vercel Inc.
           <br />
@@ -57,37 +66,17 @@ export default function MentionsLegales() {
           </a>
         </p>
 
-        <h2 style={{ fontSize: 20, fontWeight: 700, margin: '32px 0 12px', color: '#0f172a' }}>
-          Liens d&apos;affiliation
-        </h2>
-        <p>
-          Ce site et l&apos;application SaveTide contiennent des liens
-          d&apos;affiliation. Lorsque vous cliquez sur un lien marchand et
-          effectuez un achat, nous pouvons recevoir une commission. Cela
-          n&apos;affecte pas le prix que vous payez. Les resultats de
-          comparaison de prix sont affiches de maniere objective, du prix le
-          plus bas au plus eleve, independamment des commissions
-          d&apos;affiliation.
-        </p>
+        <h2 style={h2Style}>{t('mentions.s3.title')}</h2>
+        <p>{t('mentions.s3.desc')}</p>
 
-        <h2 style={{ fontSize: 20, fontWeight: 700, margin: '32px 0 12px', color: '#0f172a' }}>
-          Propriete intellectuelle
-        </h2>
-        <p>
-          L&apos;ensemble du contenu de ce site (textes, images, logo, code
-          source) est protege par le droit de la propriete intellectuelle.
-          Toute reproduction, meme partielle, est soumise a autorisation
-          prealable.
-        </p>
+        <h2 style={h2Style}>{t('mentions.s4.title')}</h2>
+        <p>{t('mentions.s4.desc')}</p>
 
-        <h2 style={{ fontSize: 20, fontWeight: 700, margin: '32px 0 12px', color: '#0f172a' }}>
-          Donnees personnelles
-        </h2>
+        <h2 style={h2Style}>{t('mentions.s5.title')}</h2>
         <p>
-          Pour toute information relative au traitement de vos donnees
-          personnelles, consultez notre{' '}
+          {t('mentions.s5.desc')}{' '}
           <a href="/privacy" style={{ color: '#0ea5e9' }}>
-            Politique de Confidentialite
+            {t('footer.privacy')}
           </a>
           .
         </p>

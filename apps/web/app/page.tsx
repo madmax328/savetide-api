@@ -1,7 +1,14 @@
+'use client';
+
+import { useLocale } from './lib/LocaleProvider';
+import { LangSwitcher } from './lib/LangSwitcher';
+
 export default function Home() {
+  const { t } = useLocale();
+
   return (
     <>
-      {/* ─── Navbar ─────────────────────────────────────────── */}
+      {/* Navbar */}
       <nav className="navbar">
         <div className="navbar-inner">
           <div className="nav-logo">
@@ -9,11 +16,12 @@ export default function Home() {
           </div>
 
           <div className="nav-links">
-            <a href="#features">Fonctionnalites</a>
-            <a href="#how-it-works">Comment ca marche</a>
-            <a href="#merchants">Marchands</a>
+            <a href="#features">{t('nav.features')}</a>
+            <a href="#how-it-works">{t('nav.howItWorks')}</a>
+            <a href="#merchants">{t('merchants.tag')}</a>
+            <LangSwitcher />
             <a href="#download" className="nav-cta">
-              Telecharger
+              {t('nav.download')}
             </a>
           </div>
 
@@ -25,36 +33,34 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* ─── Hero ───────────────────────────────────────────── */}
+      {/* Hero */}
       <section className="hero">
         <div className="hero-inner">
           <div className="hero-badge">
             <span className="dot" />
-            Disponible en beta sur iOS (TestFlight)
+            {t('hero.badge')}
           </div>
 
           <h1>
-            Trouvez le <span className="highlight">meilleur prix</span> en un
-            instant
+            {t('hero.title.before')}
+            <span className="highlight">{t('hero.title.highlight')}</span>
+            {t('hero.title.after')}
           </h1>
 
-          <p className="hero-desc">
-            Scannez un code-barre ou recherchez un produit pour comparer les
-            prix parmi des centaines de marchands. Gratuit, rapide et sans pub.
-          </p>
+          <p className="hero-desc">{t('hero.desc')}</p>
 
           <div className="hero-buttons">
             <a href="#download" className="btn-primary">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Telecharger gratuitement
+              {t('hero.cta')}
             </a>
             <a href="#features" className="btn-secondary">
-              En savoir plus
+              {t('hero.learnMore')}
             </a>
           </div>
 
           <div className="hero-stores">
-            <p>Comparez les prix sur</p>
+            <p>{t('hero.compareOn')}</p>
             <div className="store-logos">
               <span>Amazon</span>
               <span>Fnac</span>
@@ -68,173 +74,117 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ─── Features ───────────────────────────────────────── */}
+      {/* Features */}
       <section className="features" id="features">
         <div className="section-inner">
           <div className="section-header">
-            <span className="section-tag">Fonctionnalites</span>
-            <h2>Tout ce dont vous avez besoin</h2>
-            <p>
-              SaveTide compare les prix pour vous et vous aide a economiser sur
-              chaque achat.
-            </p>
+            <span className="section-tag">{t('features.tag')}</span>
+            <h2>{t('features.title')}</h2>
+            <p>{t('features.desc')}</p>
           </div>
 
           <div className="features-grid">
             <div className="feature-card">
-              <div
-                className="feature-icon"
-                style={{ background: '#dbeafe' }}
-              >
+              <div className="feature-icon" style={{ background: '#dbeafe' }}>
                 <span role="img" aria-label="scan">
-                  📱
+                  {'📱'}
                 </span>
               </div>
-              <h3>Scan code-barre</h3>
-              <p>
-                Scannez n&apos;importe quel code-barre en magasin pour comparer
-                instantanement les prix en ligne et trouver la meilleure offre.
-              </p>
+              <h3>{t('features.scan.title')}</h3>
+              <p>{t('features.scan.desc')}</p>
             </div>
 
             <div className="feature-card">
-              <div
-                className="feature-icon"
-                style={{ background: '#fef3c7' }}
-              >
+              <div className="feature-icon" style={{ background: '#fef3c7' }}>
                 <span role="img" aria-label="search">
-                  🔍
+                  {'🔍'}
                 </span>
               </div>
-              <h3>Recherche par nom</h3>
-              <p>
-                Recherchez n&apos;importe quel produit par son nom et obtenez
-                les prix de tous les marchands tries du moins cher au plus
-                cher.
-              </p>
+              <h3>{t('features.search.title')}</h3>
+              <p>{t('features.search.desc')}</p>
             </div>
 
             <div className="feature-card">
-              <div
-                className="feature-icon"
-                style={{ background: '#d1fae5' }}
-              >
+              <div className="feature-icon" style={{ background: '#d1fae5' }}>
                 <span role="img" aria-label="chart">
-                  📊
+                  {'📊'}
                 </span>
               </div>
-              <h3>Historique des prix</h3>
-              <p>
-                Suivez l&apos;evolution du prix d&apos;un produit dans le temps.
-                Savez si c&apos;est le bon moment d&apos;acheter ou s&apos;il
-                vaut mieux attendre.
-              </p>
+              <h3>{t('features.history.title')}</h3>
+              <p>{t('features.history.desc')}</p>
             </div>
 
             <div className="feature-card">
-              <div
-                className="feature-icon"
-                style={{ background: '#fce7f3' }}
-              >
+              <div className="feature-icon" style={{ background: '#fce7f3' }}>
                 <span role="img" aria-label="bell">
-                  🔔
+                  {'🔔'}
                 </span>
               </div>
-              <h3>Alertes de prix</h3>
-              <p>
-                Definissez un prix cible et recevez une notification quand le
-                produit atteint votre prix ideal. Ne ratez plus aucune bonne
-                affaire.
-              </p>
+              <h3>{t('features.alerts.title')}</h3>
+              <p>{t('features.alerts.desc')}</p>
             </div>
 
             <div className="feature-card">
-              <div
-                className="feature-icon"
-                style={{ background: '#ede9fe' }}
-              >
+              <div className="feature-icon" style={{ background: '#ede9fe' }}>
                 <span role="img" aria-label="globe">
-                  🌍
+                  {'🌍'}
                 </span>
               </div>
-              <h3>Multi-pays</h3>
-              <p>
-                Disponible en France et aux Etats-Unis avec les marchands
-                locaux de chaque pays. D&apos;autres pays arrivent bientot.
-              </p>
+              <h3>{t('features.multi.title')}</h3>
+              <p>{t('features.multi.desc')}</p>
             </div>
 
             <div className="feature-card">
-              <div
-                className="feature-icon"
-                style={{ background: '#e0f2fe' }}
-              >
+              <div className="feature-icon" style={{ background: '#e0f2fe' }}>
                 <span role="img" aria-label="gift">
-                  🎁
+                  {'🎁'}
                 </span>
               </div>
-              <h3>100% gratuit</h3>
-              <p>
-                SaveTide est entierement gratuit. Pas d&apos;abonnement, pas de
-                frais caches. Comparez et economisez sans limites.
-              </p>
+              <h3>{t('features.free.title')}</h3>
+              <p>{t('features.free.desc')}</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ─── How it works ───────────────────────────────────── */}
+      {/* How it works */}
       <section className="how-it-works" id="how-it-works">
         <div className="section-inner">
           <div className="section-header">
-            <span className="section-tag">Comment ca marche</span>
-            <h2>3 etapes, c&apos;est tout</h2>
-            <p>
-              Trouvez le meilleur prix en quelques secondes.
-            </p>
+            <span className="section-tag">{t('how.tag')}</span>
+            <h2>{t('how.title')}</h2>
+            <p>{t('how.desc')}</p>
           </div>
 
           <div className="steps">
             <div className="step">
               <div className="step-number">1</div>
-              <h3>Scannez ou recherchez</h3>
-              <p>
-                Scannez le code-barre du produit en magasin ou tapez son nom
-                dans la barre de recherche.
-              </p>
+              <h3>{t('how.step1.title')}</h3>
+              <p>{t('how.step1.desc')}</p>
             </div>
 
             <div className="step">
               <div className="step-number">2</div>
-              <h3>Comparez les prix</h3>
-              <p>
-                Visualisez les prix de dizaines de marchands tries du moins cher
-                au plus cher, en un coup d&apos;oeil.
-              </p>
+              <h3>{t('how.step2.title')}</h3>
+              <p>{t('how.step2.desc')}</p>
             </div>
 
             <div className="step">
               <div className="step-number">3</div>
-              <h3>Achetez au meilleur prix</h3>
-              <p>
-                Cliquez sur le marchand de votre choix pour aller directement
-                sur la page du produit et finaliser votre achat.
-              </p>
+              <h3>{t('how.step3.title')}</h3>
+              <p>{t('how.step3.desc')}</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ─── Merchants ──────────────────────────────────────── */}
+      {/* Merchants */}
       <section className="merchants" id="merchants">
         <div className="section-inner">
           <div className="section-header">
-            <span className="section-tag">Marchands</span>
-            <h2>Des centaines de marchands compares</h2>
-            <p>
-              Nous comparons les prix des plus grands marchands en France et
-              aux Etats-Unis.
-            </p>
+            <span className="section-tag">{t('merchants.tag')}</span>
+            <h2>{t('merchants.title')}</h2>
+            <p>{t('merchants.desc')}</p>
           </div>
 
           <div className="merchants-grid">
@@ -264,13 +214,10 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ─── CTA / Download ─────────────────────────────────── */}
+      {/* CTA / Download */}
       <section className="cta-section" id="download">
-        <h2>Pret a economiser ?</h2>
-        <p>
-          Telechargez SaveTide gratuitement et commencez a trouver les
-          meilleurs prix des aujourd&apos;hui.
-        </p>
+        <h2>{t('cta.title')}</h2>
+        <p>{t('cta.desc')}</p>
         <div className="cta-buttons">
           <a
             href="https://testflight.apple.com/join/KAJTdfCK"
@@ -278,63 +225,57 @@ export default function Home() {
             rel="noopener noreferrer"
             className="store-button"
           >
-            <span className="store-icon">🍎</span>
+            <span className="store-icon">{'🍎'}</span>
             <span className="store-label">
-              <small>Tester sur iOS via</small>
+              <small>{t('cta.ios')}</small>
               TestFlight
             </span>
           </a>
           <button className="store-button store-button-disabled" disabled>
-            <span className="store-icon">▶️</span>
+            <span className="store-icon">{'▶️'}</span>
             <span className="store-label">
-              <small>Bientot sur</small>
+              <small>{t('cta.android.soon')}</small>
               Google Play
             </span>
           </button>
         </div>
-        <p className="download-note">
-          L&apos;application est actuellement en beta. Testez-la gratuitement
-          sur iOS via TestFlight.
-        </p>
+        <p className="download-note">{t('cta.note')}</p>
       </section>
 
-      {/* ─── Footer ─────────────────────────────────────────── */}
+      {/* Footer */}
       <footer className="footer">
         <div className="footer-inner">
           <div className="footer-brand">
             <div className="footer-logo">
               Save<span>Tide</span>
             </div>
-            <p>
-              Comparateur de prix intelligent. Scannez, comparez, economisez
-              sur tous vos achats.
-            </p>
+            <p>{t('footer.desc')}</p>
           </div>
 
           <div className="footer-col">
-            <h4>Produit</h4>
-            <a href="#features">Fonctionnalites</a>
-            <a href="#how-it-works">Comment ca marche</a>
-            <a href="#merchants">Marchands</a>
-            <a href="#download">Telecharger</a>
+            <h4>{t('footer.product')}</h4>
+            <a href="#features">{t('nav.features')}</a>
+            <a href="#how-it-works">{t('nav.howItWorks')}</a>
+            <a href="#merchants">{t('merchants.tag')}</a>
+            <a href="#download">{t('nav.download')}</a>
           </div>
 
           <div className="footer-col">
-            <h4>Legal</h4>
-            <a href="/privacy">Politique de confidentialite</a>
-            <a href="/terms">Conditions d&apos;utilisation</a>
-            <a href="/mentions">Mentions legales</a>
+            <h4>{t('footer.legal')}</h4>
+            <a href="/privacy">{t('footer.privacy')}</a>
+            <a href="/terms">{t('footer.terms')}</a>
+            <a href="/mentions">{t('footer.mentions')}</a>
           </div>
 
           <div className="footer-col">
-            <h4>Contact</h4>
+            <h4>{t('footer.contact')}</h4>
             <a href="mailto:contact@savetide.com">contact@savetide.com</a>
           </div>
         </div>
 
         <div className="footer-bottom">
-          <span>&copy; {new Date().getFullYear()} SaveTide. Tous droits reserves.</span>
-          <a href="/privacy">Confidentialite</a>
+          <span>&copy; {new Date().getFullYear()} SaveTide. {t('footer.rights')}</span>
+          <a href="/privacy">{t('footer.privacyShort')}</a>
         </div>
       </footer>
     </>
