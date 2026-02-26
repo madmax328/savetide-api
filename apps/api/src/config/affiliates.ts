@@ -115,12 +115,12 @@ export const AFFILIATE_CONFIGS: Record<string, AffiliateConfig> = {
     paramName: 'ref',
   },
   rueducommerce: {
-    enabled: false,
+    enabled: true,
     networkName: 'Awin',
-    affiliateId: '',
+    affiliateId: '2780990',
     strategy: 'awin_deeplink',
-    awinPublisherId: '',
-    awinAdvertiserId: '',
+    awinPublisherId: '2780990',
+    awinAdvertiserId: '6901',
   },
 
   // --- General / Home FR ---
